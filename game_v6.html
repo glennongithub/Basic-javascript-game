@@ -1,0 +1,1038 @@
+<html>
+<head>
+<script src="includes/vec2d.js" type="text/javascript"></script>
+<script type="text/javascript" src="includes/input.js"></script>
+<script>
+/*
+V6 - 
+switching to npm vector2d lib .. it seam to be fast and fullfill all my requirements. *
+Not so much work .. only change all new Vec2 to Vec2D.crete .. and fix so we feed radians inte rotate function .. lib does not have rotate by angle.. Maybe I fix .. or just multiply by PI/180 everywhere its needed
+
+Had to replace some .x .y ti getX and setX and so ont to .. little more work than expected..
+
+Will try vectorfunctions later.
+
+Added framskipp function and slowmo function to
+
+/
+
+
+/*Preload images that will be used*/
+
+var star_Img = new Image();
+    star_Img.src = "star.png";
+
+    rocket_Img = new Image();
+    rocket_Img.src = "rocket_large.png";
+
+
+window.onload = function() {
+/*Tanken är att denna fork skall göras till en asteroids clon
+typ .. iaf i movment*/
+
+    var canvas = document.getElementById('canvas');
+    //WebGL2D.enable(canvas); // adds "webgl-2d" context to cvs
+    
+
+    //var ctx = canvas.getContext('2d');
+    var ctx = canvas.getContext('2d');
+    var framerate = 0; 
+    canvas.width = 800;
+    canvas.height = 600;
+
+var requestAnimFrame = (function() {
+        return window.requestAnimationFrame    ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame    ||
+            window.oRequestAnimationFrame      ||
+            window.msRequestAnimationFrame     ||
+            function(callback){
+                window.setTimeout(callback, 1000 / 60);
+            };
+    })();
+
+
+
+
+function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) {
+
+    //Maybe more params to be set by contructor later .. but now first just lets define what we really need to be able to do
+    /********************************/
+    /*
+    *on/of
+    emitter-direction
+    emitter position
+    array of particles. 
+        all particles will have pos, vel(is also dir), age, dead/live
+    particle speed/vel
+    exitspeed. Also meybe with some boundaries to randimize between
+    some kind of boundaries where emitter direction will be able to radomize between..
+
+    some kind of latest free/dead particle pointer . that will loop through array and restart at end.
+
+    Functions
+    initiate all particles. create them .. as dead of cource.
+    update and draw.. in on and same i think will be best.
+
+
+    /***************************/
+
+    //Theese might already been set by global vars .. but if we vant to override those
+    var bouncines = 200; 
+    var absorb_constant = 40
+    var ground_friction = 0.1;
+    
+
+    //Some vars to be used later.
+    var parts_to_create;
+    var temp_emit_dir = Vec2D.create(0,0);
+    var max_simulation_timestep = 0.002;
+    var iterations;
+    var dt_part;
+    var tmp_vec = Vec2D.create(0,0);
+
+    //Thos will be set by contructor
+    this.nrofparticles = nrofparticles;
+    this.emitter_pos = pos; //pos shoud be a Vec2
+    this.exit_vel = vel; //should be float.. will be multiplied with emit_dir px/sec
+    this.maxage = maxage; //Time particel will live.
+    this.emit_interval = (1/particles_per_second ) ;
+
+    //Rest is hardcoded for now.
+    this.particles = new Array(nrofparticles);
+    this.emit_dir = Vec2D.create(0,1); //Straight down if not annything else is said
+    this.emit_dir_tolerance = 40 * (Math.PI / 180);//deg it can vary..Wil be randomized
+    this.exit_vel_tolerance = 50; //Float .. +/- px/sec it could dif .. will be randomized
+    this.next_particle_to_activate = 0; //this will lop trough array of particles..
+    this.is_emitting = false; //This will be set directly or via method I will crate later.
+    
+    this.last_time_count = 0; //The count will be counted down with dt for each passage
+    this.init = function() {
+        for(i=0;i<this.particles.length;i++) {
+            this.particles[i] = {
+                pos: Vec2D.create(0,0),
+                vel: Vec2D.create(0,0),
+                birthtime: 0,
+                age: 0,
+                live: false
+            };
+        }
+
+    };
+
+
+    this.update_and_draw = function(dt) {
+        //Emit new particles maybe.
+        //count down last_time_count
+        if(do_slowmo){ dt *= slowmo_factor; }
+        this.last_time_count -= dt;  //Putting this here will make it posible to start emitting dirrectly ... while if putting this cound-down after  is_emittin-test .. it will really always be minimum the intervall timeout between emits.
+        //If is emitting
+        if(this.is_emitting == true) {
+            //if now - last_time >= emit_interval
+            //console.log("last_time_count:"+ this.last_time_count  +"Intervall = "+this.emit_interval+" dt:"+dt);
+            if(this.last_time_count <= 0) { //new particle is to be emitted
+                
+                //First controll how manny that should have been emitted since lat time .. (if short intervall it migt be more then one)
+                if(Math.abs(this.last_time_count) > this.emit_interval) {//if we passed more than one intervall since last time
+                    parts_to_create  = ~~(Math.abs(this.last_time_count)/this.emit_interval); //fastest way to do integer division acording to http://stackoverflow.com/questions/4228356/integer-division-in-javascript
+                    this.last_time_count = this.emit_interval + this.last_time_count%this.emit_interval;  //% give reminder ov div .. witch shall be subtracted from intervall resett time
+
+                } else {
+                    //Just forward the overhead time-count to next loop
+                    this.last_time_count += this.emit_interval; //last_time_count will we negative .. so .. it will subtract som from the counter
+                    parts_to_create = 1;
+
+                }
+
+                for (i=0;i<parts_to_create;i++) {
+                    //Emit new
+                    //console.log("Emitting nr:"+this.next_particle_to_activate +"");
+                    this.particles[this.next_particle_to_activate].live = true;
+                    //Set val by val or else thy will just be redf's to emitter_pos
+                    this.particles[this.next_particle_to_activate].pos.setX(this.emitter_pos.getX());
+                    this.particles[this.next_particle_to_activate].pos.setY(this.emitter_pos.getY());
+                    //Here we migth ad som randomness to vel and dir .. within set boundaries
+                    
+                    // (Math.random()*this.emit_dir_tolerance)-(this.emit_dir_tolerance/2)  should be between rotate betwenn -10 to +10 if tolerande is 20
+                    //since we d a loop here emit_dir migt not be resett between all emitted particle s.. so we 
+                    temp_emit_dir.setX(this.emit_dir.getX());
+                    temp_emit_dir.setY(this.emit_dir.getY());
+
+                    temp_emit_dir.rotate( (Math.random()*this.emit_dir_tolerance )-((this.emit_dir_tolerance )/2));  //Ok to rotate emit_dir .. since it is synked with Player every frame before update. 
+
+                    //this.particles[this.next_particle_to_activate].vel = temp_emit_dir.mulS(this.exit_vel);
+                    //Testing not using vec2 func.. instead dong manual mul one by one below
+                    this.particles[this.next_particle_to_activate].vel.setX(temp_emit_dir.getX() * this.exit_vel);
+                    this.particles[this.next_particle_to_activate].vel.setY(temp_emit_dir.getY() * this.exit_vel);
+                    
+                    this.particles[this.next_particle_to_activate].age = 0; //Resett age so it can relive
+                    
+                    
+                    //Now make sure we point to next in array
+                    this.next_particle_to_activate++;
+                    if (this.next_particle_to_activate > this.nrofparticles-1) {this.next_particle_to_activate = 0; }
+                }
+            }    
+        } else {
+            //Just resett timer so thet we do not build upp mass counter for emitt 
+            //Reset timer
+            this.last_time_count = this.emit_interval;
+            //If we wuold like to be able to for instance fire imedeatly .. we can set it to 0
+        }
+
+
+        //loop through all particles
+        for(i=0;i<this.particles.length;i++) {
+            //if alive
+            if(this.particles[i].live){
+                
+                //We do separate physics simulation of particles .. due to they might be manny and we might want do do some cheating 
+                //with the simulation that we do not want to do with rst of game. Particles are only cosmetic so not so important to behave exactly right.
+                                
+                //Create several step simulation
+                //This migt be one of the steps we can cheat on .. just do one big dt step . instead of several 
+                iterations = Math.round(dt/max_simulation_timestep)+1;
+                dt_part = dt/iterations;
+                /*Cheating by not doing the iterations loop .. only do once*/
+                /*By experience this will result in more unstable simulation and will force us to ajust repulse-forces and such to behave acceptable*/
+                /*But still if it looks ok it will be a resanable tradeof*/
+                dt_part = dt;
+
+                /*for (it=0; it< iterations; it++) {*/
+                    
+                
+                    //Apply gravity
+                    this.particles[i].vel.setY(this.particles[i].vel.getY() + (gravity *dt_part) ) ;
+                    
+                    //Test performance-hit if we bounce each particle against world-wall
+                    /*Bounce worldwalls .*****************************/
+                    /*************************************************/
+                    
+                    
+                    if(this.particles[i].pos.getX()+4 > WorldMap.width){
+                        //save vel for use after reseting it
+                        //Apply frictionforce along wall axis 
+                        this.particles[i].vel.setY(this.particles[i].vel.getY() - (this.particles[i].vel.getY() * ground_friction));
+                        //absorb vel by  val but only if moving into the wall not when already pushed enough to move away
+
+                        //If particle moving into the wall absorb some of its energy
+                        if (this.particles[i].vel.getX() > 0) {this.particles[i].vel.setX(this.particles[i].vel.getX() - ((this.particles[i].vel.getX() * absorb_constant) * dt_part)) ; }
+                       
+                        //Now repulse
+                        this.particles[i].vel.setX(this.particles[i].vel.getX() + ((WorldMap.width - (this.particles[i].pos.getX()+4)) * bouncines ) * dt_part ) ;
+                    }
+
+                    //Do coresponding to rest of walls to
+                    if(this.particles[i].pos.getX()-4 < 0){
+                        if (this.particles[i].vel.getX() < 0) {this.particles[i].vel.setX(this.particles[i].vel.getX() - ((this.particles[i].vel.getX() * absorb_constant) * dt_part)); }
+                        this.particles[i].vel.setX(this.particles[i].vel.getX() + ((0-(this.particles[i].pos.getX()-4)) * bouncines ) * dt_part);
+                    }
+                    if(this.particles[i].pos.getY()+4 > WorldMap.height){
+                        this.particles[i].vel.setX(this.particles[i].vel.getX() - (this.particles[i].vel.getX() * ground_friction));
+                        if (this.particles[i].vel.getY() > 0) {this.particles[i].vel.setY(this.particles[i].vel.getY() - ((this.particles[i].vel.getY() * absorb_constant) * dt_part)) ; }
+                        this.particles[i].vel.setY(this.particles[i].vel.getY() + ((WorldMap.height - (this.particles[i].pos.getY()+4)) * bouncines ) * dt_part ) ;
+                    }
+                    if(this.particles[i].pos.getY()-4 < 0){
+                        if (this.particles[i].vel.getY() < 0) {this.particles[i].vel.setY(this.particles[i].vel.getY() - ((this.particles[i].vel.getY() * absorb_constant) * dt_part)); }
+                        this.particles[i].vel.setY(this.particles[i].vel.getY() + ((0-(this.particles[i].pos.getY()-4)) * bouncines ) * dt_part);
+                    }
+                    
+                    /************************************************/
+                    /************************************************/
+
+                    //Do the actual move
+                    //this.particles[i].pos = this.particles[i].pos.addV(this.particles[i].vel.mulS(dt_part));
+                    //Do it manualy one by one insted by vec2 func
+                    this.particles[i].pos.setX(this.particles[i].pos.getX() + (this.particles[i].vel.getX() * dt_part) ) ;
+                    this.particles[i].pos.setY(this.particles[i].pos.getY() + (this.particles[i].vel.getY() * dt_part) ) ;
+
+
+                /*};*/
+
+                //render to cam-coordinates
+                //ctx.fillRect(Camera.world_to_relative_pos(this.particles[i].pos).getX(), Camera.world_to_relative_pos(this.particles[i].pos).getY(), 1, 1);
+                Camera.world_to_relative_pos(this.particles[i].pos, tmp_vec);
+                
+                //Shall be the fastest.
+                //ctx.fillStyle = '#' + Number(16777216 | px.r << 16 | px.g << 8 | px.b).toString(16).substr(1);
+                
+                //Shall be second best
+                ctx.fillStyle = 'rgba(' + 250 + ',' + 200 + ',' + 10 + ',' + ( 1- (this.particles[i].age/this.maxage)) + ')';
+                //ctx.fillStyle = 'rgba(' + 250 + ',' + 200 + ',' + 10 + ',' + ( 1) + ')';
+                //ctx.fillStyle = 'rgba(' + 200 + ',' + 30 + ',' + 10 + ',' + 0.5 + ')';
+                ctx.fillRect(tmp_vec.getX()-2, tmp_vec.getY()-2, 4, 4);  //ajust pos to with of particle size  size= 4 pos -2
+                
+                //update age
+                this.particles[i].age += dt; //ad dt to age. 
+                //if more than maxage
+                //console.log("Age:"+this.particles[i].age+" Maxage:"+this.maxage);
+                if(this.particles[i].age > this.maxage) {
+                    //set dead
+                    this.particles[i].live = false;
+                }
+            }
+        }
+
+    };
+
+    this.init(); //Initiate particle-emitter.
+}
+
+
+
+    var Player = {
+        pos: Vec2D.create(200,200),
+        x: 200,
+        y: 200,
+        width: 21,
+        height: 31,
+        rotatespeed: 300 * (Math.PI / 180), //In degees per second
+        current_rotation: 0,
+        velocity: Vec2D.create(0,0),
+        color: '#c00',
+        dir_v2: Vec2D.create(1,0), //This is ower-written in update since we recalc rotation from start rot that we set there .. TODO .. rethingk where this should be handeled
+        item_mas: 1, //The mass of item .. will effect force aplied to it.
+        trust: 700,
+        rell_pos : Vec2D.create(0,0),
+        avatar_verts: [Vec2D.create(-15,15),Vec2D.create(0,-15),Vec2D.create(15,15)],  //This is vectors that when draw a line from first to last creates the avatar representing the same pos as start rotation
+        temp_avatar_verts: [Vec2D.create(-5,5),Vec2D.create(0,-5),Vec2D.create(5,5)], //To be able to rotate above withoute owerwrite original state.
+        generic_temp_vector:Vec2D.create(0,0),
+        pemiter : new particelemitter(200, Vec2D.create(200,200), 300.1, 0.5, 200), //nrofparticles, pos, vel in px per sec, maxage, particles_per_second
+        pemiter_rel_to_player_pos: Vec2D.create(0,15),
+        render: function (dt) {
+            //Now render players relative pos to camera
+            //Here we can choose to render the iten/player in various ways . depending on functionality we like to have
+            
+            // Rendermethod 1.. only rect.
+            Camera.world_to_relative_pos(this.pos, this.rell_pos);
+            //ctx.fillRect(this.rell_pos.getX()-(this.width/2), this.rell_pos.getY()-(this.height/2), this.width, this.height);
+
+            //Cros-hair: print dot 20 px from player center in forward dir
+            ctx.fillStyle = '#0c0';
+            ctx.fillRect(this.rell_pos.getX() + this.dir_v2.getX() * 30, this.rell_pos.getY() + this.dir_v2.getY() * 30, 1, 1);
+            
+
+
+            //Rendermethod 2: try to draw som lines betwen dots.
+            //Rotate avatar dots 
+            /*
+            ctx.beginPath();
+            ctx.strokeStyle="red";
+            ctx.lineWidth=5;
+            var draw_started = false;
+            for(i=0;i<this.avatar_verts.length; i++)
+            {
+                //Clone it 
+                this.temp_avatar_verts[i].setX(this.avatar_verts[i].getX()) ;
+                this.temp_avatar_verts[i].setY(this.avatar_verts[i].getY()) ;
+                //Then rotate temp
+                this.temp_avatar_verts[i].rotate((this.current_rotation)); 
+
+                //Calc relworldpos
+                //this.temp_avatar_verts[i] = Camera.world_to_relative_pos(this.pos.addV(this.temp_avatar_verts[i]));
+                //Manual one by one instead of above
+                this.generic_temp_vector.setX(this.pos.getX() + this.temp_avatar_verts[i].getX());
+                this.generic_temp_vector.setY(this.pos.getY() + this.temp_avatar_verts[i].getY());
+                Camera.world_to_relative_pos(this.generic_temp_vector, this.temp_avatar_verts[i]);
+
+                //Print dots to world
+                ctx.fillStyle = '#fff';
+                //ctx.fillRect(this.temp_avatar_verts[i].getX() , this.temp_avatar_verts[i].getY(), 1, 1);
+
+                if(!draw_started) { 
+                    ctx.moveTo(this.temp_avatar_verts[i].getX() , this.temp_avatar_verts[i].getY()); 
+                    draw_started = true;
+                } else {
+                    ctx.lineTo(this.temp_avatar_verts[i].getX() , this.temp_avatar_verts[i].getY());
+                }
+
+            }
+            ctx.stroke();
+            */
+
+            //Render as image
+            
+             Camera.world_to_relative_pos(this.pos, this.rell_pos);
+
+            //Now to be able to rotate img . we actualy rotate canvas. -> draw -> then rotate canvas back.
+            ctx.translate(Math.round(this.rell_pos.getX()), Math.round(this.rell_pos.getY()));
+            ctx.rotate( this.current_rotation);
+            ctx.drawImage(rocket_Img, 0, 0, rocket_Img.width,rocket_Img.height,-(Math.round(this.width/2)),-(Math.round(this.height/2)),this.width,this.height); 
+            ctx.rotate( -( this.current_rotation));
+            ctx.translate(-Math.round(this.rell_pos.getX()), -Math.round(this.rell_pos.getY()));
+            
+
+
+            //Render Particles
+            //First make sure emitter is possitioned exaktly where we want it..
+
+            //Can be done in 2 way .. easy way first
+            //Center it to Player
+            //this.pemiter.emitter_pos.setX(this.pos.getX());
+            //this.pemiter.emitter_pos.setY(this.pos.getY());
+
+            //Or mor flexible: Use a specific pos relative to player set in params above
+            //and borow avatar temp vec to rotate it right. If we knew that pos will be in line plyer direction .. we could use same method as croshair above
+
+            //Clone it 
+            this.temp_avatar_verts[1].setX(this.pemiter_rel_to_player_pos.getX());
+            this.temp_avatar_verts[1].setY(this.pemiter_rel_to_player_pos.getY());
+            //Then rotate temp
+            this.temp_avatar_verts[1].rotate((this.current_rotation) );
+            //Calc relworldpos
+            //this.temp_avatar_verts[1] = this.pos.addV(this.temp_avatar_verts[1]);
+            //One by one instead of above
+            this.temp_avatar_verts[1].setX(this.temp_avatar_verts[1].getX() + this.pos.getX()) ;
+            this.temp_avatar_verts[1].setY(this.temp_avatar_verts[1].getY() + this.pos.getY())  ;
+
+
+            //Soo now set emitter_ps to that
+            this.pemiter.emitter_pos.setX(this.temp_avatar_verts[1].getX()) ;
+            this.pemiter.emitter_pos.setY(this.temp_avatar_verts[1].getY()) ;
+
+
+
+            //Set emit_dir to opposit Player dir since dhis is rocket engine! :)
+            this.pemiter.emit_dir.setX(-this.dir_v2.getX());
+            this.pemiter.emit_dir.setY(-this.dir_v2.getY());
+            //Now process them
+            this.pemiter.update_and_draw(dt);
+            
+
+        },
+        update: function(dt) {
+            
+            /*read keys and set force*/
+            if (GameInput.isDown('LEFT')) {
+                
+                this.current_rotation -= this.rotatespeed * dt;
+            }
+
+            if (GameInput.isDown('UP')) { //Forward = add force to 
+                //Add rocketforce
+                //this.velocity = this.velocity.addV(this.dir_v2.mulS(dt*this.trust/this.item_mas));
+                //One by one instead of obove
+                this.velocity.setX(this.velocity.getX() + this.dir_v2.getX() * (this.trust/this.item_mas) * dt);
+                this.velocity.setY(this.velocity.getY() + this.dir_v2.getY() * (this.trust/this.item_mas) * dt);
+                //Turn on emitter
+                this.pemiter.is_emitting = true;
+            } else {
+                //Turn of emitter
+                this.pemiter.is_emitting = false;
+            }
+
+            if (GameInput.isDown('RIGHT')) {
+                
+                this.current_rotation += this.rotatespeed * dt;
+            }
+            if (GameInput.isDown('DOWN')) {
+                
+            }
+            if (GameInput.isDown('S')){
+                if(!slowmo_waiting_for_keyup) { //If key is not pressed / in released state .. we make sure
+                    do_slowmo = !do_slowmo; //Toggle
+                    slowmo_waiting_for_keyup = true; //and make usre we does not toggle untill next release and pressed again.
+                }
+            } else { 
+                slowmo_waiting_for_keyup = false;
+            }
+            if (GameInput.isDown('F')){
+                if(!frameskipp_waiting_for_keyup) { //If key is not pressed / in released state .. we make sure
+                    do_frameskipp = !do_frameskipp; //Toggle
+                    frameskipp_waiting_for_keyup = true; //and make usre we does not toggle untill next release and pressed again.
+                }
+            } else { 
+                frameskipp_waiting_for_keyup = false;
+            }
+
+            //Apply gravity
+            this.velocity.setY(this.velocity.getY() + (gravity*dt));
+
+            //Apply air_friction
+            //this.velocity = this.velocity.subV(this.velocity.mulS(air_friction/this.item_mas*dt)); //vel = vel - (vel*airfriction/mass) Higer speed mor break.. moer mass less break
+            //One by one instead of obove
+            this.velocity.setX(this.velocity.getX() - this.velocity.getX() * (air_friction/this.item_mas) * dt);
+            this.velocity.setY(this.velocity.getY() - this.velocity.getY() * (air_friction/this.item_mas) * dt);
+
+            //Update dir_v2 acording to current_rotation
+            //Rotate from startpos straight up .. meenig resett so ve rotate from that.
+            this.dir_v2.setX(0); 
+            this.dir_v2.setY(-1); 
+
+            this.dir_v2.rotate(this.current_rotation);
+
+            
+            //Now update possition
+            //this.pos = this.pos.addV(this.velocity.mulS(dt));
+            //One by one instead of above
+            this.pos.setX(this.pos.getX() + this.velocity.getX() *dt) ;
+            this.pos.setY(this.pos.getY() + this.velocity.getY() *dt) ;
+
+            /*warp world*/
+            /*
+            if(this.pos.getX() > WorldMap.width){this.pos.getX() = this.pos.getX() - WorldMap.width; }
+            if(this.pos.getX() < 0){this.pos.getX() = this.pos.getX() + WorldMap.width; }
+            if(this.pos.getY() > WorldMap.height){this.pos.getY() = this.pos.getY() - WorldMap.height; }
+            if(this.pos.getY() < 0){this.pos.getY() = this.pos.getY() + WorldMap.height; }
+            */
+
+            /*Bounce worldwalls .*/
+
+                       
+            if(this.pos.getX()+20 > WorldMap.width){
+                this.velocity.setY(this.velocity.getY() - (this.velocity.getY() * ground_friction) ); //slide olong wall friction
+                if (this.velocity.getX() > 0) {this.velocity.getX(this.velocity.getX() - (this.velocity.getX() * absorb_constant) * dt); }
+                this.velocity.setX(this.velocity.getX() + ((WorldMap.width - (this.pos.getX()+20)) * bouncines ) * dt) ;
+            }
+            if(this.pos.getX()-20 < 0){
+                if (this.velocity.getX() < 0) {this.velocity.setX(this.velocity.getX() - (this.velocity.getX() * absorb_constant) * dt); }
+                this.velocity.setX(this.velocity.getX() + (((0- (this.pos.getX()-20)) * bouncines ) * dt) );
+            }
+            if(this.pos.getY()+20 > WorldMap.height){
+                this.velocity.setX(this.velocity.getX() - (this.velocity.getX() * ground_friction)); //slide olong wall friction
+                if (this.velocity.getY() > 0) {this.velocity.setY(this.velocity.getY() - (this.velocity.getY() * absorb_constant) * dt); }
+                this.velocity.setY(this.velocity.getY() + ((WorldMap.height - (this.pos.getY()+20)) * bouncines ) * dt);
+            }
+            if(this.pos.getY()-20 < 0){
+                if (this.velocity.getY() < 0) {this.velocity.setY(this.velocity.getY() - (this.velocity.getY() * absorb_constant) * dt); }
+                this.velocity.setY(this.velocity.getY() + (((0- (this.pos.getY()-20)) * bouncines ) * dt) );
+            }
+            
+        }
+        
+    };
+    
+
+    var Camera = {
+        viewport_width : canvas.width, //This could be something smaler if we would use some area of canvas for displaying oterh things but the world. Like health ..etc
+        viewport_height : canvas.height,
+        half_width: (canvas.width/2),
+        half_height: (canvas.height/2),
+        viewport_pos : Vec2D.create(100,100), //Center of camera focus.
+        cam_flex_x: 10,  //cam_flex controls how much movment will be done from center before cam starts to folow
+        cam_flex_y:10,
+        recalibrate_focus: function() {
+            //Allow some drift acording to cam_flex setting.
+            if(Player.pos.getX() > this.viewport_pos.getX()){ //Player is positive compared to vireport
+                if ( (Player.pos.getX() - this.viewport_pos.getX()) > this.cam_flex_x ) //So only update cam veiwpos if we are outside the flex area. 
+                {     
+                    //Correct viewportpos by add diff .the amount it went outside camflex
+                    this.viewport_pos.setX(this.viewport_pos.getX() + (Player.pos.getX() - this.viewport_pos.getX() - this.cam_flex_x)); 
+                }
+            } else if (Player.pos.getX() < this.viewport_pos.getX()) {//Player is negative compared to vireport
+                if ( (this.viewport_pos.getX() - Player.pos.getX()) > this.cam_flex_x ) //So only update cam veiwpos if we are outside the flex area. 
+                {
+                    //Correct viewportpos by add diff .the amount it went outside camflex 
+                    this.viewport_pos.setX(this.viewport_pos.getX() - (this.viewport_pos.getX() - Player.pos.getX() - this.cam_flex_x)); 
+                }
+
+            }
+
+            if(Player.pos.getY() > this.viewport_pos.getY()){ //Player is positive compared to vireport
+                if ( (Player.pos.getY() - this.viewport_pos.getY()) > this.cam_flex_y ) //So only update cam veiwpos if we are outside the flex area. 
+                {     
+                    //Correct viewportpos by add diff .the amount it went outside camflex
+                    this.viewport_pos.setY(this.viewport_pos.getY() + (Player.pos.getY() - this.viewport_pos.getY() - this.cam_flex_y)); 
+                }
+            } else if (Player.pos.getY() < this.viewport_pos.getY()) {//Player is negative compared to vireport
+                if ( (this.viewport_pos.getY() - Player.pos.getY()) > this.cam_flex_y ) //So only update cam veiwpos if we are outside the flex area. 
+                {
+                    //Correct viewportpos by add diff .the amount it went outside camflex 
+                    this.viewport_pos.setY(this.viewport_pos.getY() - (this.viewport_pos.getY() - Player.pos.getY() - this.cam_flex_y)); 
+                }
+
+            }
+
+            //Try to round it of to get rid of fussy background   And it WORKED .. no mor fuzzy background
+            this.viewport_pos.setX(Math.round(this.viewport_pos.getX())); 
+            this.viewport_pos.setY(Math.round(this.viewport_pos.getY()));
+            
+
+
+            //Never let viewport get outside world-boundaries
+            if (this.viewport_pos.getX() < this.half_width) { this.viewport_pos.setX(this.half_width); }
+            if (this.viewport_pos.getX() > (WorldMap.width - this.half_width)) { this.viewport_pos.setX(WorldMap.width - this.half_width); }
+            if (this.viewport_pos.getY() < this.half_height) { this.viewport_pos.setY(this.half_height); }
+            if (this.viewport_pos.getY() > (WorldMap.height - this.half_height)) { this.viewport_pos.setY(WorldMap.height - this.half_height); }
+        },
+        world_to_relative_pos: function(wpos, rpos) {
+            rpos.setX(wpos.getX()-this.viewport_pos.getX()+(this.half_width));
+            rpos.setY(wpos.getY()-this.viewport_pos.getY()+(this.half_height));
+            return rpos;
+
+
+        }
+
+     }
+    
+
+
+    var WorldMap = {
+        width: 2300,
+        height: 1600,
+        //Obove obvious bad solution .since it creates a enourmous/humongus image.. so I realy have to do tiling . 
+        //Fixed .. now it creates tiled world from below tilesize
+
+        //I'l need the folowing.
+
+        tilesize: 512, //not to small since we want to avoud to obvious patterns
+        nr_of_tiles: 3, //The hight and width of tilemap
+        world_width_in_tile_cols : Math.floor(this.width/this.tilesize)+1, //one extra so we do not have empty space at the rightmost end.
+        world_height_in_tile_rows : Math.floor(this.height/this.tilesize)+1, //one extra so we do not have empty space at the rightmost end.
+
+
+        background_canvas: document.createElement('canvas'), //There seam to bee the best solution to create a new document object .. a new canvas and work with that imagedata
+        background_canvas_z2: document.createElement('canvas'), //second depth ..  further away from camera
+        background_canvas_z3: document.createElement('canvas'), //next depth ..  even further away from camera
+        background_canvas_z2_size: 0.5, //a value betwen 0-1 where 0 i infinity far away and will not move at all all 1 is in face and will mov as standrard bg.
+        background_canvas_z3_size: 0.1, //should be smaler than 2
+        bg_tilemap: new Array(),  //Those will tell witch tiles will be where in the world.
+        bg_tilemap_z2: new Array(),
+        bg_tilemap_z3: new Array(),
+
+        render_from_fullimage: function(){ //
+            //Render world and background
+           
+            var world_sx = Camera.viewport_pos.getX() -(Camera.viewport_width/2);
+            var world_sy = Camera.viewport_pos.getY() -(Camera.viewport_height/2);
+            ctx.drawImage(this.background_canvas, world_sx, world_sy, Camera.viewport_width,Camera.viewport_height,0,0,Camera.viewport_width,Camera.viewport_height); //Clips so we only se part of word centered around player
+            
+            
+            //Now draw paralax bg´s with different depth
+            var world_sx = (Camera.viewport_pos.getX() -(Camera.viewport_width/2)) *this.background_canvas_z2_size;//Make sure source-imagepos is trimed down acording to seize  of that depth-bg
+            var world_sy = (Camera.viewport_pos.getY() -(Camera.viewport_height/2)) *this.background_canvas_z2_size;
+            ctx.drawImage(this.background_canvas_z2, world_sx, world_sy, Camera.viewport_width,Camera.viewport_height,0,0,Camera.viewport_width,Camera.viewport_height);
+
+            //Now draw paralax bg´s with different depth
+            var world_sx = (Camera.viewport_pos.getX() -(Camera.viewport_width/2)) *this.background_canvas_z3_size;//Make sure source-imagepos is trimed down acording to seize  of that depth-bg
+            var world_sy = (Camera.viewport_pos.getY() -(Camera.viewport_height/2)) *this.background_canvas_z3_size;
+            ctx.drawImage(this.background_canvas_z3, world_sx, world_sy, Camera.viewport_width,Camera.viewport_height,0,0,Camera.viewport_width,Camera.viewport_height);
+            
+        },
+        render_from_randomized_tiles: function(){ //
+            //Render world and background
+            
+            var world_sx = Camera.viewport_pos.getX() -(Camera.viewport_width/2);
+            var world_sy = Camera.viewport_pos.getY() -(Camera.viewport_height/2);
+
+            //offset x pixels we have to start draw outside screen since cam-view pos left is not exactly aligned with  left of current tile
+            //offset y pixels we have to start draw outside screen since cam-view pos top is not exactly aligned with top  of current tile
+            offset_x = world_sx % this.tilesize;
+            offset_y = world_sy % this.tilesize;
+
+            //Diferent offsetts for diffrent paralax depths
+            offset_x_z2 = (world_sx * this.background_canvas_z2_size)% this.tilesize;
+            offset_y_z2 = (world_sy * this.background_canvas_z2_size)% this.tilesize;
+
+            offset_x_z3 = (world_sx * this.background_canvas_z3_size)% this.tilesize;
+            offset_y_z3 = (world_sy * this.background_canvas_z3_size)% this.tilesize;
+
+            
+
+            var first_tile_x = Math.floor(world_sx / this.tilesize); //Tiles in tilemap to start from ..ajusted to where camera is looking.
+            var first_tile_y = Math.floor(world_sy / this.tilesize);
+
+
+            //Also diferent first tiles for fiferent paralaxdepths
+            var first_tile_x_z2 = Math.floor(world_sx * this.background_canvas_z2_size / this.tilesize); //Tiles in tilemap to start from ..ajusted to where camera is looking.
+            var first_tile_y_z2 = Math.floor(world_sy * this.background_canvas_z2_size/ this.tilesize);
+
+            var first_tile_x_z3 = Math.floor(world_sx * this.background_canvas_z3_size / this.tilesize); //Tiles in tilemap to start from ..ajusted to where camera is looking.
+            var first_tile_y_z3 = Math.floor(world_sy * this.background_canvas_z3_size/ this.tilesize);
+
+
+            //ctx.drawImage(this.background_canvas, world_sx, world_sy, Camera.viewport_width,Camera.viewport_height,0,0,Camera.viewport_width,Camera.viewport_height); //Clips so we only se part of word centered around player
+
+            //AAAARgh .. should not be world width . chould be canvas or camera with in tiles rows and cols . 
+            rows_to_draw = Math.floor(Camera.viewport_height/this.tilesize)+2;
+            cols_to_draw = Math.floor(Camera.viewport_width/this.tilesize)+2;
+
+            for(iy=0;iy<rows_to_draw;iy++){ //each row  !!IN CANVAS/CAMERA not world
+                for(ix=0;ix<cols_to_draw;ix++){//each col
+                    //Now we have a tilemap to look in for the layout of the tiles .. like tile to print = tilemap[(iy*world_height_in_tile_rows)+ix].getX() and y  where the map points to witch tile in our tilemap shall be shown in current part of map
+                   
+                    //From:
+                    var fromx = this.bg_tilemap[(iy+first_tile_y)*this.world_width_in_tile_cols  +  ix+first_tile_x].getX() * this.tilesize; //Tilecoords in imagemap
+                    var fromy = this.bg_tilemap[(iy+first_tile_y)*this.world_width_in_tile_cols  +  ix+first_tile_x].getY() * this.tilesize; //Tilecoords in imagemap
+                    //To
+                    var tocanvasx = ix*this.tilesize -offset_x;
+                    var tocanvasy = iy*this.tilesize -offset_y;
+                    ctx.drawImage(this.background_canvas, fromx, fromy, this.tilesize,this.tilesize,tocanvasx,tocanvasy,this.tilesize,this.tilesize);
+
+                    
+                    //From:
+                    var fromx = this.bg_tilemap_z2[(iy+first_tile_y_z2)*this.world_width_in_tile_cols  +  ix+first_tile_x_z2].getX() * this.tilesize; //Tilecoords in imagemap
+                    var fromy = this.bg_tilemap_z2[(iy+first_tile_y_z2)*this.world_width_in_tile_cols  +  ix+first_tile_x_z2].getY() * this.tilesize; //Tilecoords in imagemap
+                    //To
+                    var tocanvasx = ix*this.tilesize -offset_x_z2;
+                    var tocanvasy = iy*this.tilesize -offset_y_z2;
+                    ctx.drawImage(this.background_canvas_z2, fromx, fromy, this.tilesize,this.tilesize,tocanvasx,tocanvasy,this.tilesize,this.tilesize);
+
+                    //From:
+                    var fromx = this.bg_tilemap_z3[(iy+first_tile_y_z3)*this.world_width_in_tile_cols  +  ix+first_tile_x_z3].getX() * this.tilesize; //Tilecoords in imagemap
+                    var fromy = this.bg_tilemap_z3[(iy+first_tile_y_z3)*this.world_width_in_tile_cols  +  ix+first_tile_x_z3].getY() * this.tilesize; //Tilecoords in imagemap
+                    //To
+                    var tocanvasx = ix*this.tilesize -offset_x_z3;
+                    var tocanvasy = iy*this.tilesize -offset_y_z3;
+                    ctx.drawImage(this.background_canvas_z3, fromx, fromy, this.tilesize,this.tilesize,tocanvasx,tocanvasy,this.tilesize,this.tilesize);
+                }
+            }
+        }
+    };
+
+ //Build background-image-data
+ 
+ 
+ //New version building tileset of choosen size and and nr.
+ WorldMap.background_canvas.width = WorldMap.background_canvas.height = WorldMap.tilesize*(WorldMap.nr_of_tiles); //
+ var WorldBgContext = WorldMap.background_canvas.getContext('2d');
+
+ //Build paralax scrolling bg´s for diferent depths. Uses same size 2x but will be filled with diferent sized stars for BG's
+ WorldMap.background_canvas_z2.width = WorldMap.background_canvas_z2.height = WorldMap.tilesize*(WorldMap.nr_of_tiles); //
+ var WorldBgContext_z2 = WorldMap.background_canvas_z2.getContext('2d');
+
+ WorldMap.background_canvas_z3.width = WorldMap.background_canvas_z3.height = WorldMap.tilesize*(WorldMap.nr_of_tiles); //
+ var WorldBgContext_z3 = WorldMap.background_canvas_z3.getContext('2d');
+ 
+ //Now fill them with random stars
+for(iy=0; iy<WorldMap.background_canvas.height;iy++) { //do equal amont of stars in every depth .. cound be anny vall . jsut using height as test now.
+     var r = Math.floor((Math.random()*255)+1);
+     var g = 100;
+     var b = 150;
+     //var g = Math.floor((Math.random()*255)+1);
+     //var b = Math.floor((Math.random()*255)+1);
+     var a = 200;
+     WorldBgContext.fillStyle = "rgba("+r+","+g+","+b+","+(a/255)+")";
+     //WorldBgContext.fillRect( ix, iy, 1, 1 );
+     var t_px_size = Math.floor((Math.random()*7)+3); //Biggest size for closest bg
+     //WorldBgContext.fillRect( Math.floor((Math.random()*WorldMap.background_canvas.width)+1), (Math.floor(Math.random()*WorldMap.background_canvas.height)+1), t_px_size, t_px_size );
+     WorldBgContext.drawImage(star_Img, 0,0,5,5,Math.floor((Math.random()*WorldMap.background_canvas.width)+1),(Math.floor(Math.random()*WorldMap.background_canvas.height)+1),t_px_size,t_px_size);
+
+     WorldBgContext_z2.fillStyle = "rgba("+r+","+g+","+b+","+(a/255)+")";
+     var t_px_size = Math.floor((Math.random()*5)+2); //Litle bit smaler
+     //WorldBgContext_z2.fillRect( Math.floor((Math.random()*WorldMap.background_canvas_z2.width)+1), Math.floor((Math.random()*WorldMap.background_canvas_z2.height)+1), t_px_size, t_px_size );
+     WorldBgContext_z2.drawImage(star_Img, 0,0,5,5,Math.floor((Math.random()*WorldMap.background_canvas_z2.width)+1),(Math.floor(Math.random()*WorldMap.background_canvas_z2.height)+1),t_px_size,t_px_size);
+
+     WorldBgContext_z3.fillStyle = "rgba("+r+","+g+","+b+","+(a/255)+")";
+     var t_px_size = Math.floor((Math.random()*2)+1); //Litle bit smaler
+     //WorldBgContext_z3.fillRect( Math.floor((Math.random()*WorldMap.background_canvas_z3.width)+1), Math.floor((Math.random()*WorldMap.background_canvas_z3.height)+1), t_px_size, t_px_size );
+     WorldBgContext_z3.drawImage(star_Img, 0,0,5,5,Math.floor((Math.random()*WorldMap.background_canvas_z3.width)+1),(Math.floor(Math.random()*WorldMap.background_canvas_z3.height)+1),t_px_size,t_px_size);
+}
+
+//Now whe we have created our randomized tilecontetn .. we also has to create a tilemap .. wich we also will randomize.
+//For some reason setting values in object like this does not work .. so do it again here 
+WorldMap.world_width_in_tile_cols = Math.floor(WorldMap.width/WorldMap.tilesize)+2; //one extra so we do not have empty space at the rightmost end.
+WorldMap.world_height_in_tile_rows = Math.floor(WorldMap.height/WorldMap.tilesize)+2 //one extra so we do not have empty space at the rightmost end.
+
+//console.log(WorldMap.world_height_in_tile_rows + " : " +WorldMap.world_width_in_tile_cols);
+
+for(iy=0; iy<(WorldMap.world_height_in_tile_rows); iy++){ //each row
+    //console.log("now");
+    for(ix=0; ix<(WorldMap.world_width_in_tile_cols); ix++){//each col
+        //Now we have to create a tilemap to look in for the layout of the tiles .. like tile to print = tilemap[(iy*world_width_in_tile_cols)+ix] where the map points to 
+        //console.log("now2");
+
+        WorldMap.bg_tilemap[(iy*WorldMap.world_width_in_tile_cols)+ix] = Vec2D.create(Math.floor(Math.random()*WorldMap.nr_of_tiles) , Math.floor(Math.random()*WorldMap.nr_of_tiles) ); //3x3 tileset = 3 tiles to randomise from = 0 -> 2
+
+        //Creating same sized tilemaps evn for deeper paralax bg's for now ..even if it will not be visibel .. Instead of doing 2 more for loops. ajusted to their size.
+        WorldMap.bg_tilemap_z2[(iy*WorldMap.world_width_in_tile_cols)+ix] = Vec2D.create(Math.floor(Math.random()*WorldMap.nr_of_tiles) , Math.floor(Math.random()*WorldMap.nr_of_tiles) ); 
+
+        WorldMap.bg_tilemap_z3[(iy*WorldMap.world_width_in_tile_cols)+ix] = Vec2D.create(Math.floor(Math.random()*WorldMap.nr_of_tiles) , Math.floor(Math.random()*WorldMap.nr_of_tiles) ); 
+        //WorldMap.bg_tilemap_z3[(iy*WorldMap.world_height_in_tile_rows)+ix] = Math.floor(Math.random()*WorldMap.nr_of_tiles-1); //3x3 tileset = 3 tiles to randomise from = 0 -> 2
+    }
+}
+
+
+
+
+
+     /**********************************************************************************************************************/
+
+
+     //Old version. using full size imagemap for whole world .. werry large image witch slows down script at certain size.
+     /*
+     WorldMap.background_canvas.width = WorldMap.width;
+     WorldMap.background_canvas.height = WorldMap.height;
+     var WorldBgContext = WorldMap.background_canvas.getContext('2d');
+
+     //Build paralax scrolling bg´s for diferent depths
+     WorldMap.background_canvas_z2.width = WorldMap.width * WorldMap.background_canvas_z2_size + Camera.viewport_width;
+     WorldMap.background_canvas_z2.height = WorldMap.height * WorldMap.background_canvas_z2_size + Camera.viewport_height;
+     var WorldBgContext_z2 = WorldMap.background_canvas_z2.getContext('2d');
+
+     WorldMap.background_canvas_z3.width = WorldMap.width * WorldMap.background_canvas_z3_size + Camera.viewport_width;
+     WorldMap.background_canvas_z3.height = WorldMap.height * WorldMap.background_canvas_z3_size + Camera.viewport_height;
+     var WorldBgContext_z3 = WorldMap.background_canvas_z3.getContext('2d');
+
+
+
+     for(iy=0; iy<WorldMap.background_canvas.height;iy++) { //do equal amont of stars in every depth
+        //for(ix=0; ix<WorldMap.background_canvas.width;ix++) {
+
+             var r = Math.floor((Math.random()*255)+1);
+             var g = 100;
+             var b = 150;
+             //var g = Math.floor((Math.random()*255)+1);
+             //var b = Math.floor((Math.random()*255)+1);
+             var a = 200;
+             WorldBgContext.fillStyle = "rgba("+r+","+g+","+b+","+(a/255)+")";
+             //WorldBgContext.fillRect( ix, iy, 1, 1 );
+             var t_px_zize = (Math.random()*7)+3; //Biggest size for closest bg
+             WorldBgContext.fillRect( (Math.random()*WorldMap.width)+1, (Math.random()*WorldMap.height)+1, t_px_zize, t_px_zize );
+
+             WorldBgContext_z2.fillStyle = "rgba("+r+","+g+","+b+","+(a/255)+")";
+             var t_px_zize = (Math.random()*5)+2; //Litle bit smaler
+             WorldBgContext_z2.fillRect( (Math.random()*WorldMap.background_canvas_z2.width)+1, (Math.random()*WorldMap.background_canvas_z2.height)+1, t_px_zize, t_px_zize );
+
+             WorldBgContext_z3.fillStyle = "rgba("+r+","+g+","+b+","+(a/255)+")";
+             var t_px_zize = (Math.random()*2)+1; //Litle bit smaler
+             WorldBgContext_z3.fillRect( (Math.random()*WorldMap.background_canvas_z3.width)+1, (Math.random()*WorldMap.background_canvas_z3.height)+1, t_px_zize, t_px_zize );
+        //}
+
+     }
+
+    */
+
+
+    var gravity = 9.8 *40; //  10Px = 1m -> 98px/sec
+    var air_friction = 0.53; //
+    var do_slowmo = false;
+    var slowmo_factor = 0.2; // 1 no slowmo -- 0.1 much slowmo  
+    var slowmo_waiting_for_keyup = false;
+    var do_frameskipp = false;
+    var frameskipp_waiting_for_keyup = false;
+
+
+    // Don't run the game when the tab isn't visible
+    window.addEventListener('focus', function() {
+        unpause();
+    });
+
+    window.addEventListener('blur', function() {
+        pause();
+    });
+
+    // Functions ---
+
+
+    // Reset game to original state
+    function reset() {
+       /* player.x = 0;
+        player.y = 0;
+        */
+    }
+
+    // Pause and unpause
+    function pause() {
+        running = false;
+    }
+
+    function unpause() {
+        running = true;
+        time = Date.now();
+        main();
+    }
+   
+    function update(dt) {
+        
+        //Create several step simulation
+        var max_simulation_timestep = 0.002;
+        var iterations = Math.round(dt/max_simulation_timestep)+1;
+        var dt_part = dt/iterations;
+        
+        if(do_slowmo){ dt_part *= slowmo_factor; }
+
+        for (it=0; it< iterations; it++) {
+            Player.update(dt_part);
+        }
+        
+        //Player.update(dt);
+    }
+     
+    function render(dt) {
+        //Clear canvas
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        //Update cam position/focus.
+        Camera.recalibrate_focus();
+
+        //Render world and background
+        //WorldMap.render_from_fullimage();
+        WorldMap.render_from_randomized_tiles();
+        
+        //Render All items and player
+        Player.render(dt);
+
+        //Render framerate.
+        ctx.fillStyle = '#0f0';
+        ctx.fillText("Framerate: "+ framerate +"/s ", 10, 10);
+        ctx.fillText("Time/Last: "+ (time - last), 10, 20);
+        ctx.fillText("Framecount: "+ framecount +"/s ", 10, 30);
+
+        
+    }
+     
+    function run() {
+        var dt = (Date.now() - time) / 1000; //dt is in seconds
+        update(dt);
+        render(dt);
+        framecount++; //count frames
+        time = Date.now();
+        if (time - last > 1000 ) //If more than one sec has pased 
+        {
+            //Calculate framerate
+            framerate = framecount / ((time - last) / 1000);
+            //Resett last and frame count
+            last = time;
+            framecount = 0;
+
+        }
+    }
+
+    function main() {
+        
+        requestAnimFrame(main);
+        
+        if(!running) {
+            return;
+        }
+
+        if (do_frameskipp) skip = !skip;  //To only run at 30 fps.
+        if (skip) {
+            run();
+        }
+        
+        
+    }
+
+    var time = Date.now();
+    var framecount = 0;
+    var last = time;
+    var running = true;
+    //Set some game-global vars .. Maybe move those later .. but for now
+    var bouncines = 1280; //
+    var absorb_constant = 40
+    var ground_friction = 0.02;
+    var skip = true;
+
+    //Some temp vars used in rotation calc.. 
+    var t_radians;
+    var t_cos;
+    var t_sin;
+    var t_nx;
+    var t_ny;
+
+    //Now start th game
+    main();
+
+
+    var lastUsedHeap = 0;  // remember the heap size
+    function checkMemory()
+    {
+        // check if the heap size is this cycle is LESS than what we had last
+        // cycle; if so, then the garbage collector has kicked in
+     
+        if (window.performance.memory.usedJSHeapSize < lastUsedHeap)
+            console.log('Garbage collected!');
+        lastUsedHeap = window.performance.memory.usedJSHeapSize;
+        //console.log('Garbage not collected!');
+        setTimeout(checkMemory, 100); // test 10 times per second
+    }
+     
+    setTimeout(checkMemory, 100); // test 10 times per second
+
+}
+
+//Todo
+/*********************************************
+
+Add prorteies box so I can ajust vals during play. to test.
+
+*Switch to pixi.js  seam to be a strong lib for doing graphics.
+
+*Test swith to vec2d lib finctions .. to se performance change maybe.
+
+
+*Really need to organise the code and think thru what stuct I vill have on objecs.. 
+    Can I have more then one player camera  and so on.. probably if I will be able to switch viacles and so. 
+
+
+*Add gravityswitch
+
+*Colission handler. Use this later.
+if (object1.getX() < object2.getX() + object2.width  && object1.getX() + object1.width  > object2.getX() &&
+        object1.getY() < object2.getY() + object2.height && object1.getY() + object1.height > object2.getY()) {
+// The objects are touching
+}
+
+or even faste as found on http://devmag.org.za/2009/04/13/basic-collision-detection-in-2d-part-1/
+Controlls if the rects is not touching. If anny of below cond is true.. they are not touching.
+wich also means .. if none of these are met .. they are def touching.
+return NOT (
+        (Rect1.Bottom < Rect2.Top) OR
+        (Rect1.Top > Rect2.Bottom) OR
+        (Rect1.Left > Rect2.Right) OR
+        (Rect1.Right < Rect2.Left) )
+
+
+*Shoot function .. -Similar to particle system .. bt will of couce be able to interact with world
+
+*create planets with gravity. :)
+
+*Switch vectormath to version that does not leaves as much garbage to colletc.  -- Also look over youre own code so it des not leave GB behind
+
+
+*Create system for mapping .. tiles with different properties .. like only visible . but not stopping .. if stopping how much bouncyness and so on 
+ Depends on colission handler above .. :)
+
+
+
+*Organize renderable and interactable items.  Should they hanlde render rhemselfe or what? And for interact physically in the world .. same q there.
+    *Plan: Let all physics-affected items has one funktion for that .. all rendable items has one funk to render themselfes and so in. 
+    Then create an arry with physics-items and lopp though and call that function. And then the same with renderable items.
+    In that way we can let them have different ways of render themselfe .. but also let them inherit
+
+
+*Create system for interactable items to handle how they will be controlled . So .. for ex . if you contrill asteroides-like rocket .. that work in one way .. but if in gravity pulled viacle .. that is compleatly different .. so .. will the aplied physics be in the item-itsefe to? .. maybe a smart thing to do.
+
+
+**********************************************/
+
+
+//Done
+/*********************************************
+*Add slowmotion function .. 
+
+*Added input-lib to separate file.
+
+* Switch from crappy vectorcode to one of the folowing candidates
+glmatrix-version , vector2d on npm, vectors from three or from mathlib used by  Canvas3D on kevs3d.co.uk
+I would realy like to be able to use vecto.getY() and .getY() referece since that make the code so mych simler to read .. when doing bounce and collision calculation stuff.
+ADDED Vec2D lib .. but still using none of its functions except rotation.. 
+
+*add posibility to use img instead of just squares.
+
+*Finish cameromode with camera_slak and all
+*Change rotationfuntion to store curretn rotation so that sipler rotation can be done.  not rotate 0.0001 deg each time .. instead .. add 0,001 deg to rotation and then rotate round(current rotation)  No point in actualy swith to lookuptables for sin and cos .. current javascript func acually faster
+
+*Particle-engine. Will I relly loop though all particles once for pos-update and then once more for render.. or will I be able to update pos and at the same time render to some temp-canvas thet later will be reder alla t once as one bitmap.  --> called from render-func in player .. and both phys update and render.. since it unlikely it will interact with other parts of game
+
+Tile world adn br to avoid those enourmous bitmaps
+
+
+* Camera mode .. meaning world is some size and canvas/viewport is smaler. Camera is centered somewhare (presumably on player) and  show that part of the world that fits in canvas/viewport.
+    This will be first .. since it will be frustrrating if I dont have it latr when buling other stuff.
+
+
+
+*Paralax-scrolling in at least 3 layers. As simple as for ex Realworld-width = 1000, eternitydepth = 1 + canvas/viewport-width. So Half -eterity-width = 500+canvaswidth and so on .. Find som nice positions in between that makes sense.
+**********************************************/
+
+
+</script>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+</body>
+</html>

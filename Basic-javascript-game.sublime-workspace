@@ -1,0 +1,603 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"thi",
+				"animationToUseThisFrame"
+			],
+			[
+				"an",
+				"animationToUseThisFrame"
+			],
+			[
+				"do",
+				"down"
+			],
+			[
+				"vel",
+				"velDirection"
+			],
+			[
+				"acce",
+				"accelForce"
+			],
+			[
+				"main",
+				"mainPlayer"
+			],
+			[
+				"sprite",
+				"spriteheight"
+			],
+			[
+				"re",
+				"register"
+			],
+			[
+				"col",
+				"collided"
+			],
+			[
+				"bouncin",
+				"bouncines"
+			],
+			[
+				"woe",
+				"world_to_relative_pos"
+			],
+			[
+				"vec",
+				"vec2d"
+			],
+			[
+				"V",
+				"Vec2"
+			],
+			[
+				"Get",
+				"getX"
+			],
+			[
+				"slowmo",
+				"slowmo_factor"
+			],
+			[
+				"w",
+				"wpos"
+			],
+			[
+				"gene",
+				"generic_temp_vector"
+			],
+			[
+				"it",
+				"iterations"
+			],
+			[
+				"ab",
+				"absorb_constant"
+			],
+			[
+				"pa",
+				"particles"
+			],
+			[
+				"hal",
+				"half_height"
+			],
+			[
+				"rock",
+				"rocket_Img"
+			],
+			[
+				"dr",
+				"drawImage"
+			],
+			[
+				"tile",
+				"tilesize"
+			],
+			[
+				"toca",
+				"tocanvasy"
+			],
+			[
+				"tiel",
+				"tilesize"
+			],
+			[
+				"world",
+				"world_sx"
+			],
+			[
+				"offse",
+				"offset_x"
+			],
+			[
+				"bg_tilemap_",
+				"bg_tilemap_z2"
+			],
+			[
+				"Wor",
+				"WorldMap"
+			],
+			[
+				"til",
+				"tilesize"
+			],
+			[
+				"parts",
+				"parts_to_create"
+			],
+			[
+				"last_t",
+				"last_time_count"
+			],
+			[
+				"temp",
+				"temp_dir"
+			],
+			[
+				"dir_",
+				"emit_dir_tolerance"
+			],
+			[
+				"rotate",
+				"rotateByAngle"
+			],
+			[
+				"is",
+				"is_emitting"
+			],
+			[
+				"dir",
+				"dir_v2"
+			],
+			[
+				"per",
+				"pemiter"
+			],
+			[
+				"las",
+				"last_time_count"
+			],
+			[
+				"em",
+				"emit_interval"
+			],
+			[
+				"last",
+				"last_time_count"
+			],
+			[
+				"up",
+				"update_and_draw"
+			],
+			[
+				"wo",
+				"world_to_relative_pos"
+			],
+			[
+				"mul",
+				"mulS"
+			],
+			[
+				"exit",
+				"exit_vel"
+			],
+			[
+				"emi",
+				"emit_interval"
+			],
+			[
+				"n",
+				"now"
+			],
+			[
+				"par",
+				"particles"
+			],
+			[
+				"nor",
+				"nrofparticles"
+			],
+			[
+				"draw",
+				"draw_started"
+			],
+			[
+				"ad",
+				"addV"
+			],
+			[
+				"tem",
+				"temp_avatar_verts"
+			],
+			[
+				"avat",
+				"avatar_verts"
+			],
+			[
+				"cu",
+				"current_rotation"
+			],
+			[
+				"rela",
+				"relative_pos"
+			],
+			[
+				"worl",
+				"world_to_relative_pos"
+			],
+			[
+				"half",
+				"half_width"
+			],
+			[
+				"view",
+				"viewport_pos"
+			],
+			[
+				"vi",
+				"viewport_width"
+			],
+			[
+				"C",
+				"Camera"
+			],
+			[
+				"fun",
+				"function"
+			],
+			[
+				"back",
+				"background_canvas"
+			],
+			[
+				"W",
+				"WorldMap"
+			],
+			[
+				"get",
+				"getContext"
+			],
+			[
+				"h",
+				"height"
+			],
+			[
+				"vire",
+				"viewport-width"
+			],
+			[
+				"wi",
+				"width"
+			],
+			[
+				"canv",
+				"canvas"
+			],
+			[
+				"fr",
+				"framecount"
+			],
+			[
+				"frame",
+				"framecount"
+			],
+			[
+				"ti",
+				"time"
+			],
+			[
+				"fram",
+				"framecount"
+			]
+		]
+	},
+	"buffers":
+	[
+	],
+	"build_system": "",
+	"command_palette":
+	{
+		"height": 392.0,
+		"selected_items":
+		[
+			[
+				"ins",
+				"Package Control: Install Package"
+			],
+			[
+				"inst",
+				"Package Control: Install Package"
+			],
+			[
+				"install",
+				"Package Control: Install Package"
+			]
+		],
+		"width": 416.0
+	},
+	"console":
+	{
+		"height": 126.0,
+		"history":
+		[
+			"import urllib.request,os,hashlib; h = '7183a2d3e96f11eeadd761d777e62404' + 'e330c659d4bb41d3bdf022e94cab3cd0'; pf = 'Package Control.sublime-package'; ipp = sublime.installed_packages_path(); urllib.request.install_opener( urllib.request.build_opener( urllib.request.ProxyHandler()) ); by = urllib.request.urlopen( 'http://sublime.wbond.net/' + pf.replace(' ', '%20')).read(); dh = hashlib.sha256(by).hexdigest(); print('Error validating download (got %s instead of %s), please try manual install' % (dh, h)) if dh != h else open(os.path.join( ipp, pf), 'wb' ).write(by)"
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"file_history":
+	[
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/game_v7.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/my_gitrepos/Node-Mayhem/views/game.jade",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/public/js/screens/play.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/public/js/game.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/public/js/entities/collectibale.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/public/js/entities/extraEntities.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/server.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/public/js/entities/player.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/public/lib/melonJS-1.0.0.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/public/js/entities/bulletEntity.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/public/js/audio.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/views/game.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/public/js/entities/entities.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/views/index.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/server.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/views/game.jade",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/public/js/resources.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/public/js/screens/play.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/public/js/resources.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/public/js/game.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/public/lib/melonJS-1.0.0.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/src/level/LevelDirector.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/views/index.jade",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/js/resources.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/src/level/TMXObjectGroup.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/js/entities/entities.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/js/screens/play.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/js/game.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/package.json",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/views/Nytt textdokument.txt",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/views/index.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/public/lib/plugins/debugPanel.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/js/entities/HUD.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/index.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/public/js/entities/HUD.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/public/lib/melonJS-0.9.10.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Ny mapp/Node-Mayhem-master/public/js/entities/player.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Ny mapp/Node-Mayhem-master/public/js/highscore.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Ny mapp/Node-Mayhem-master/public/js/game.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Ny mapp/Node-Mayhem-master/views/game.jade",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/public/js/screens/title.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/src/core.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/node_modules/socket.io/lib/socket.io.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/node_modules/socket.io/lib/namespace.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/node_modules/socket.io/lib/util.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/node_modules/socket.io/lib/socket.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/game_v6.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/mortar-game-stub-master/index.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/boilerplate-master/lib/melonJS-1.0.0.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/src/entity/entity.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/melonjs-melonJS-cf4ec69/src/renderable/sprite.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/includes/vec2d.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/sat-js-master/examples/examples.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/sat-js-master/examples/dynamic_collision.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/includes/SAT.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/physicsjs-0.6.0/renderers/pixi-renderer.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/views/index.jade",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/TileGame-master/config.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/TileGame-master/src/scene.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/TileGame-master/main.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/physicsjs-0.6.0/physicsjs-0.6.0.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/kevs3d.co.uk-asteroids/index.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/IBM code/listing-9.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/IBM code/listing-1.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/IBM code/listing-3.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/IBM code/listing-6.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/IBM code/listing-7.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/IBM code/listing-8.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/box2dweb/Box2dWeb-2.1.a.3.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/mortar-game-stub-master/js/app.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/IBM code/listing-2.txt",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/vec2d.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/vec2d-master/index.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/mortar-game-stub-master/js/input.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/game_v6_tempa.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/vec2d-master/build/vec2d.js",
+		"/C/Users/GLENN~1.VIN/AppData/Local/Temp/Rar$DRa0.166/mrdoob-three.js-223f46b/src/math/Euler.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/mrdoob-three.js-223f46b/test/benchmark/benchmarking_float32array.html",
+		"/C/Users/GLENN~1.VIN/AppData/Local/Temp/Rar$DRa0.906/mrdoob-three.js-223f46b/src/math/Vector2.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/kevs3d.co.uk-asteroids/scripts/asteroids_main.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/glmatrix/dist/gl-matrix.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/canvask3d/scripts/mathlib.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/kevs3d.co.uk-asteroids/scripts/gamelib.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/glmatrix/src/gl-matrix/vec2.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/game _v1.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/game.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/game - Kopia.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/game_v2.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/game_v3.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/game_v4.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/game_v5.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/vec2d-master/perf.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/vec2d-master/old.perf.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/vec2d-master/perf.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/vec2d-master/Gruntfile.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/phoria.js-0.9.16/scripts/phoria-util.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/glmatrix/src/gl-matrix/common.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/mrdoob-three.js-223f46b/test/benchmark/core/Float32Array.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/vec2d-master/src/Closure.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/webgl-2d.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/phoria.js-0.9.16/test0.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/phoria.js-0.9.16/scripts/phoria-renderer.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/glmatrix/src/gl-matrix/mat2d.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/glmatrix/src/gl-matrix/mat2.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/glmatrix/src/gl-matrix-manifest.js",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Javascript-asteroides/game_v3.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Javascript-asteroides/game_v2 - Kopia.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Javascript-asteroides/game.html",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Javascript-asteroides/game - Kopia-2.html"
+	],
+	"find":
+	{
+		"height": 23.0
+	},
+	"find_in_files":
+	{
+		"height": 0.0,
+		"where_history":
+		[
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+			"scale",
+			"me.Renderable",
+			"Renderable",
+			"ObjectEntity",
+			"routing",
+			"adjustSize",
+			"getSha",
+			"Object.exte",
+			"exports",
+			".io",
+			"io",
+			"socket",
+			"getEntity",
+			"getEntityContainer",
+			"getEntityBy",
+			"computeVelocity",
+			"accel",
+			"input",
+			"anim",
+			"mulS",
+			"getY",
+			"getX",
+			".y",
+			".x",
+			"rotate",
+			"world_to_relative_pos",
+			"start",
+			"function start",
+			"start",
+			".start",
+			"GameHandler.start",
+			"frameMultipler",
+			"fillText"
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+			".getY()",
+			".getX()"
+		],
+		"reverse": false,
+		"show_context": true,
+		"use_buffer2": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"sheets":
+			[
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 23.0
+	},
+	"input":
+	{
+		"height": 0.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"project": "Basic-javascript-game.sublime-project",
+	"replace":
+	{
+		"height": 42.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 0.0,
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 148.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}
