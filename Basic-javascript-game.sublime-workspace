@@ -299,13 +299,53 @@
 	},
 	"buffers":
 	[
+		{
+			"file": "README.md",
+			"settings":
+			{
+				"buffer_size": 533,
+				"line_ending": "Windows"
+			}
+		}
 	],
 	"build_system": "",
 	"command_palette":
 	{
-		"height": 392.0,
+		"height": 104.0,
 		"selected_items":
 		[
+			[
+				"git:push",
+				"Git: Push"
+			],
+			[
+				"git:pu",
+				"Git: Push"
+			],
+			[
+				"git:add",
+				"Git: Add..."
+			],
+			[
+				"git",
+				"Git: Commit"
+			],
+			[
+				"git:ad",
+				"Git: Add Current File"
+			],
+			[
+				"git:com",
+				"Git: Commit"
+			],
+			[
+				"git:",
+				"Git: Commit"
+			],
+			[
+				"git:a",
+				"Git: Add..."
+			],
 			[
 				"ins",
 				"Package Control: Install Package"
@@ -319,13 +359,17 @@
 				"Package Control: Install Package"
 			]
 		],
-		"width": 416.0
+		"width": 400.0
 	},
 	"console":
 	{
-		"height": 126.0,
+		"height": 158.0,
 		"history":
 		[
+			"  git push",
+			"git commit --reset-author",
+			"git config --global user.name 'glennongithub'",
+			"git commit --",
 			"import urllib.request,os,hashlib; h = '7183a2d3e96f11eeadd761d777e62404' + 'e330c659d4bb41d3bdf022e94cab3cd0'; pf = 'Package Control.sublime-package'; ipp = sublime.installed_packages_path(); urllib.request.install_opener( urllib.request.build_opener( urllib.request.ProxyHandler()) ); by = urllib.request.urlopen( 'http://sublime.wbond.net/' + pf.replace(' ', '%20')).read(); dh = hashlib.sha256(by).hexdigest(); print('Error validating download (got %s instead of %s), please try manual install' % (dh, h)) if dh != h else open(os.path.join( ipp, pf), 'wb' ).write(by)"
 		]
 	},
@@ -340,6 +384,10 @@
 	},
 	"file_history":
 	[
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/my_gitrepos/Basic-javascript-game/Basic-javascript-game.sublime-workspace",
+		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/my_gitrepos/Basic-javascript-game/Basic-javascript-game.sublime-project",
+		"/C/Users/glenn.vinbladh/AppData/Roaming/Sublime Text 3/Packages/Git/Git.sublime-settings",
+		"/C/Users/glenn.vinbladh/AppData/Roaming/Sublime Text 3/Packages/User/Git.sublime-settings",
 		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/ny javascript-asterioids/game_v7.html",
 		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/my_gitrepos/Node-Mayhem/views/game.jade",
 		"/C/Users/glenn.vinbladh/Google Drive/Privat/Spelprogramering/Node-Mayhem-master/public/js/screens/play.js",
@@ -518,8 +566,37 @@
 	"groups":
 	[
 		{
+			"selected": 0,
 			"sheets":
 			[
+				{
+					"buffer": 0,
+					"file": "README.md",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 533,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								531,
+								531
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Markdown/Markdown.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"type": "text"
+				}
 			]
 		}
 	],
@@ -557,6 +634,10 @@
 	"output.find_results":
 	{
 		"height": 0.0
+	},
+	"output.git":
+	{
+		"height": 345.0
 	},
 	"project": "Basic-javascript-game.sublime-project",
 	"replace":
