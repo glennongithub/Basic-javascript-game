@@ -657,7 +657,7 @@
    */
   var RIGHT_VORNOI_REGION = 1;
   
-  // ## Collision Tests
+  // ## Collision 
 
   // Check if a point is inside a circle.
   /**

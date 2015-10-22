@@ -3,16 +3,9 @@
 <script>
 
 window.onload = function() {
+/*Tanken är att denna fork skall göras till en asteroids clon
+typ .. iaf i movment*/
 /*
-v2
-Added stopping world-walls instead of infinit world loop
-
-Obviously particle-emitter now works. :)
-It is arranged so that normal physicsupdate is done in update() fuction but both physics simulation and draw of those are done in end of dra function of owned actor/player.
-This is because I beleave that since the particles can be manny and need to bee looped thru it is beneficial to loop though them only once and do both physics update and canvas draw in same pass
-And the most logical is to put them after everything else is drawn .. since they shall most likely not interact with annything else
-/*
-
 Common vector operations
 Author: Tudor Nita | cgrats.com
 Version: 0.51

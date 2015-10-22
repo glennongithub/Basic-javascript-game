@@ -1,14 +1,7 @@
 <html>
 <head>
 <script>
-/*
-v4 
-Added image-loading so instead of only shapes we see real stars and real rocket.
 
-One biggie.. Added tiled world-data.. makin it posible to have enourmous worlds without enourmous background images.. by tiling few tiles acording to tilemapp.
-Took some work  ... but totaly woth it.
-Probably some more changes to ..
-*/
 /*Preload images that will be used*/
 
 var star_Img = new Image();
@@ -134,11 +127,6 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
 
     /***************************/
 
-    //Theese might already been set by global vars .. but if we vant to override those
-    /*var bouncines = 400; 
-    var absorb_constant = 20
-    var ground_friction = 0.1;
-    */
 
     //Thos will be set by contructor
     this.nrofparticles = nrofparticles;
@@ -234,12 +222,10 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
         for(i=0;i<this.particles.length;i++) {
             //if alive
             if(this.particles[i].live){
+                //update vel if we have externalforces aplied liak  gravity or air-resistance
+                //update world pos
                 
-                //We do separate physics simulation of particles .. due to they might be manny and we might want do do some cheating 
-                //with the simulation that we do not want to do with rst of game. Particles are only cosmetic so not so important to behave exactly right.
-                                
                 //Create several step simulation
-                //This migt be one of the steps we can cheat on .. just do one big dt step . instead of several 
                 var max_simulation_timestep = 0.002;
                 var iterations = Math.round(dt/max_simulation_timestep)+1;
                 var dt_part = dt/iterations;
@@ -252,11 +238,15 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
                     //Test performance-hit if we bounce each particle against world-wall
                     /*Bounce worldwalls .*****************************/
                     /*************************************************/
+
+                    var bouncines = 400; //1 = full bounce .. no force-loss .. 0 = no bounce
+                    var absorb_constant = 20
+                    var ground_friction = 0.01;
                     
                     if(this.particles[i].pos.x+2 > WorldMap.width){
                         //save vel for use after reseting it
                         //Apply frictionforce along wall axis 
-                        this.particles[i].vel.y -= (this.particles[i].vel.y * ground_friction)
+                        //this.particles[i].vel.y = this.particles[i].vel.y - (this.particles[i].vel.y * ground_friction)
                         //absorb vel by  val but only if moving into the wall not when already pushed enough to move away
 
                         /*********OBS! OBS! OBS! *******************/
@@ -277,23 +267,22 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
                     }
 
                     
-                    if(this.particles[i].pos.x-4 < 0){
+                    if(this.particles[i].pos.x-2 < 0){
                         if (this.particles[i].vel.x < 0) {this.particles[i].vel.x -= (this.particles[i].vel.x * absorb_constant) * dt_part; }
-                        this.particles[i].vel.x += ((0-(this.particles[i].pos.x-4)) * bouncines ) * dt_part;
+                        this.particles[i].vel.x += ((0-(this.particles[i].pos.x-2)) * bouncines ) * dt_part;
                     }
-                    if(this.particles[i].pos.y+4 >  WorldMap.height){
+                    if(this.particles[i].pos.y+2 >  WorldMap.height){
                         if (this.particles[i].vel.y > 0) {this.particles[i].vel.y -= (this.particles[i].vel.y * absorb_constant) * dt_part; }
-                        this.particles[i].vel.y += ((WorldMap.height - (this.particles[i].pos.y+4)) * bouncines ) * dt_part;
+                        this.particles[i].vel.y += ((WorldMap.height - (this.particles[i].pos.y+2)) * bouncines ) * dt_part;
                     }
-                    if(this.particles[i].pos.y-4 < 0){
+                    if(this.particles[i].pos.y < 0){
                         if (this.particles[i].vel.y < 0) {this.particles[i].vel.y -= (this.particles[i].vel.y * absorb_constant) * dt_part; }
-                        this.particles[i].vel.y += ((0-(this.particles[i].pos.y-4)) * bouncines ) * dt_part;
+                        this.particles[i].vel.y += ((0-(this.particles[i].pos.y-2)) * bouncines ) * dt_part;
                     }
                     
                     /************************************************/
                     /************************************************/
 
-                    //Do the actual move
                     this.particles[i].pos = this.particles[i].pos.addV(this.particles[i].vel.mulS(dt_part));
                 };
                 //render to cam-coordinates
@@ -498,9 +487,12 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
 
             /*Bounce worldwalls .*/
 
-                       
+            var bouncines = 800; //1 = full bounce .. no force-loss .. 0 = no bounce
+            var absorb_constant = 200
+            var ground_friction = 0.01;
+            
+            
             if(this.pos.x+20 > WorldMap.width){
-                this.velocity.y -= (this.velocity.y * ground_friction); //slide olong wall friction
                 if (this.velocity.x > 0) {this.velocity.x -= (this.velocity.x * absorb_constant) * dt; }
                 this.velocity.x += ((WorldMap.width - (this.pos.x+20)) * bouncines ) * dt;
             }
@@ -509,7 +501,6 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
                 this.velocity.x += ((0 - (this.pos.x-20)) * bouncines ) * dt;
             }
             if(this.pos.y+20 > WorldMap.height){
-                this.velocity.x -= (this.velocity.x * ground_friction); //slide olong wall friction
                 if (this.velocity.y > 0) {this.velocity.y -= (this.velocity.y * absorb_constant) * dt; }
                 this.velocity.y += ((WorldMap.height - (this.pos.y+20)) * bouncines ) * dt;
             }
@@ -814,7 +805,7 @@ for(iy=0; iy<(WorldMap.world_height_in_tile_rows); iy++){ //each row
 
 
     var gravity = 9.8 *40; //  10Px = 1m -> 98px/sec
-    var air_friction = 0.53; //
+    var air_friction = 1.03; //
 
     var keysDown = {};
     window.addEventListener('keydown', function(e) {
@@ -890,11 +881,6 @@ for(iy=0; iy<(WorldMap.world_height_in_tile_rows); iy++){ //each row
     var framecount = 0;
     var last = time;
     var running = true;
-    //Set some game-global vars .. Maybe move those later .. bot for now
-    var bouncines = 800; //
-    var absorb_constant = 200
-    var ground_friction = 0.01;
-
     main();
 
 }

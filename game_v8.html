@@ -1,11 +1,12 @@
 <html>
 <head>
-<script src="vec2d.js" type="text/javascript"></script>
+<script type="text/javascript" src="includes/vec2d.js"></script>
+<script type="text/javascript" src="includes/input.js"></script>
+<script type="text/javascript" src="includes/SAT.js"></script>
 <script>
 /*
-V6 - 
-switching to npm vector2d lib .. it seam to be fast and fullfill all my requirements. *
-Not so much work .. only change all new Vec2 to Vec2D.crete .. and fix so we feed radians inte rotate function .. lib does not have rotate by angle.. Maybe I fix .. or just multiply by PI/180 everywhere its needed
+V8
+Since SAT coldet worked for player ad also added worldwalls collision .. and also added same colldet för particles.
 
 /
 
@@ -98,6 +99,11 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
     this.exit_vel_tolerance = 50; //Float .. +/- px/sec it could dif .. will be randomized
     this.next_particle_to_activate = 0; //this will lop trough array of particles..
     this.is_emitting = false; //This will be set directly or via method I will crate later.
+    this.colider_radius = 1; //To use both when creating colider shape and debugger vissible circle
+    this.colider = new SAT.Circle(); //No values . overriding those later in init().
+    this.colided = false; //will be used to se if we collided or not.
+    this.response = new SAT.Response(); //Will contain overlap and overlapV  wich is total overlap .. and the exact directional vector to stop overlap. 
+    this.generic_temp_vector = Vec2D.create(0,0);
     
     this.last_time_count = 0; //The count will be counted down with dt for each passage
     this.init = function() {
@@ -110,6 +116,8 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
                 live: false
             };
         }
+     	//one colider used for all particles
+     	this.colider = new SAT.Circle(new SAT.Vector(1, 1), this.colider_radius ); //Just put it in the top-left corner to start with
 
     };
 
@@ -117,6 +125,7 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
     this.update_and_draw = function(dt) {
         //Emit new particles maybe.
         //count down last_time_count
+        if(do_slowmo){ dt *= slowmo_factor; }
         this.last_time_count -= dt;  //Putting this here will make it posible to start emitting dirrectly ... while if putting this cound-down after  is_emittin-test .. it will really always be minimum the intervall timeout between emits.
         //If is emitting
         if(this.is_emitting == true) {
@@ -124,7 +133,7 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
             //console.log("last_time_count:"+ this.last_time_count  +"Intervall = "+this.emit_interval+" dt:"+dt);
             if(this.last_time_count <= 0) { //new particle is to be emitted
                 
-                //First controll how manny that should have been emitted since lat time .. (if short intervall it migt be more then one)
+                //First controll how manny that should have been emitted since last time .. (if short intervall it migt be more then one)
                 if(Math.abs(this.last_time_count) > this.emit_interval) {//if we passed more than one intervall since last time
                     parts_to_create  = ~~(Math.abs(this.last_time_count)/this.emit_interval); //fastest way to do integer division acording to http://stackoverflow.com/questions/4228356/integer-division-in-javascript
                     this.last_time_count = this.emit_interval + this.last_time_count%this.emit_interval;  //% give reminder ov div .. witch shall be subtracted from intervall resett time
@@ -200,7 +209,7 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
                     /*Bounce worldwalls .*****************************/
                     /*************************************************/
                     
-                    
+                    /*
                     if(this.particles[i].pos.getX()+4 > WorldMap.width){
                         //save vel for use after reseting it
                         //Apply frictionforce along wall axis 
@@ -227,10 +236,54 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
                     if(this.particles[i].pos.getY()-4 < 0){
                         if (this.particles[i].vel.getY() < 0) {this.particles[i].vel.setY(this.particles[i].vel.getY() - ((this.particles[i].vel.getY() * absorb_constant) * dt_part)); }
                         this.particles[i].vel.setY(this.particles[i].vel.getY() + ((0-(this.particles[i].pos.getY()-4)) * bouncines ) * dt_part);
-                    }
-                    
+                    } 
+                    */
                     /************************************************/
                     /************************************************/
+
+                   	/************************************************/
+                   	//Testing same advanced physical bouncing as player for all particles..just to se how much performance it eats.
+                   	for (var c = worldColliders.length - 1; c >= 0; c--) {
+            
+		                this.response.clear();
+		                this.colider.pos.x = this.particles[i].pos.getX(); //Set colider to current particle pos
+		                this.colider.pos.y = this.particles[i].pos.getY(); //Set colider to current particle pos
+		                this.collided = false;
+		                this.collided = SAT.testPolygonCircle(worldColliders[c], this.colider, this.response); //polygon , circle a bit faster than the other way around
+
+		                if (this.collided) {
+		                    console.log("collided");
+		                    //Cals relative velocity In this case we know only player has vel . so rel_vel = player_vel .. should work in this case .. but make sure to take note of which obect is a and b .. since if we reverse the input in the coltest above this will shange ... since the normal wector will reverse.
+		                    //AAArgh .. need to select what vector lib to use .. well well .. for this one .. create new Vec2D vector and use that since most values are in that now.
+		                    //So use temp vector for normal-value
+		                    
+		                    //First correct for "sinking" error due to floatingpoint error
+		                        this.generic_temp_vector.setAxes(this.response.overlapV.x,this.response.overlapV.y);                
+		                        this.generic_temp_vector.multiplyByScalar(0.2);
+		                        this.particles[i].pos.add(this.generic_temp_vector); //perentage betwen 20 -80% shoud be ok
+
+		                    //Now continue with calulated response
+		                    this.generic_temp_vector.setAxes(this.response.overlapN.x,this.response.overlapN.y);
+		                    var velAlongNormal = this.particles[i].vel.dot(this.generic_temp_vector);
+
+		                    if (velAlongNormal < 0) {
+		                        var bouncines = 0.2;
+		                        //impulse scalar = -(1+bouncines) * velAlongNormal then / mas  but we have no mass yet .. so simplify
+		                        //just use normal in temp vector to stor impulse..
+		                        var t = -(1+bouncines)*velAlongNormal;
+		                        this.generic_temp_vector.multiplyByScalar(-(1+bouncines)*velAlongNormal);
+
+		                        //Now apply to vel.
+		                        //this.velocity.add(this.generic_temp_vector); //Now that shoul be it.
+		                        this.particles[i].vel.add(this.generic_temp_vector);
+
+		                    }
+		                }
+            		};
+
+
+                   	/*************************************************/
+
 
                     //Do the actual move
                     //this.particles[i].pos = this.particles[i].pos.addV(this.particles[i].vel.mulS(dt_part));
@@ -291,6 +344,18 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
         generic_temp_vector:Vec2D.create(0,0),
         pemiter : new particelemitter(200, Vec2D.create(200,200), 300.1, 0.5, 200), //nrofparticles, pos, vel in px per sec, maxage, particles_per_second
         pemiter_rel_to_player_pos: Vec2D.create(0,15),
+        //Now try to add a colider shape. We start with a circle..
+        //It will not be auto rendered by SAT-js so we have  to handle that oursefes .. of course.
+        colider_radius :15, //To use both when creating colider shape and debugger vissible circle
+        colider: new SAT.Circle(), //No values . overriding those later in init().
+        colided: false, //will be used to se if we collided or not.
+        response: new SAT.Response(), //Will contain overlap and overlapV  wich is total overlap .. and the exact directional vector to stop overlap. 
+        init: function () {
+            //Do everything needed to initiate player .. 
+            //Now when adding SAT col det .. we have to create collider shape
+            this.colider = new SAT.Circle(new SAT.Vector(this.pos.getX(), this.pos.getY()), this.colider_radius );
+
+        },
         render: function (dt) {
             //Now render players relative pos to camera
             //Here we can choose to render the iten/player in various ways . depending on functionality we like to have
@@ -302,6 +367,16 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
             //Cros-hair: print dot 20 px from player center in forward dir
             ctx.fillStyle = '#0c0';
             ctx.fillRect(this.rell_pos.getX() + this.dir_v2.getX() * 30, this.rell_pos.getY() + this.dir_v2.getY() * 30, 1, 1);
+
+            //Draw collision-shape if that is set.
+            if (do_draw_collision_shapes) {
+                ctx.beginPath();
+                ctx.arc(this.rell_pos.getX(),this.rell_pos.getY(), this.colider_radius, 0, 2 * Math.PI );
+                ctx.strokeStyle = "red";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+            }
             
 
 
@@ -352,6 +427,17 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
             ctx.drawImage(rocket_Img, 0, 0, rocket_Img.width,rocket_Img.height,-(Math.round(this.width/2)),-(Math.round(this.height/2)),this.width,this.height); 
             ctx.rotate( -( this.current_rotation));
             ctx.translate(-Math.round(this.rell_pos.getX()), -Math.round(this.rell_pos.getY()));
+
+            //Render collider for visualisation debugging
+            /*this.generic_temp_vector.setX(this.colider.pos.x); //Really stupid solution just because we use other vector lib in cam to world func
+            this.generic_temp_vector.setY(this.colider.pos.y);
+            Camera.world_to_relative_pos(this.generic_temp_vector, this.rell_pos);
+            ctx.beginPath();
+            ctx.arc(this.rell_pos.getX(), this.rell_pos.getY(), this.colider_radius, 0, 2 * Math.PI, false);
+            ctx.fillStyle = "rgba(255, 50, 50, 0.5)";
+            ctx.fill();
+            */
+
             
 
 
@@ -392,15 +478,21 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
             
 
         },
+        /**
+         * [update description]
+         * @param  {[type]} dt
+         * @return {[type]}
+         */
+        
         update: function(dt) {
             
             /*read keys and set force*/
-            if (37 in keysDown) {
+            if (GameInput.isDown('LEFT')) {
                 
                 this.current_rotation -= this.rotatespeed * dt;
             }
 
-            if (38 in keysDown) { //Forward = add force to 
+            if (GameInput.isDown('UP')) { //Forward = add force to 
                 //Add rocketforce
                 //this.velocity = this.velocity.addV(this.dir_v2.mulS(dt*this.trust/this.item_mas));
                 //One by one instead of obove
@@ -413,16 +505,48 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
                 this.pemiter.is_emitting = false;
             }
 
-            if (39 in keysDown) {
+            if (GameInput.isDown('RIGHT')) {
                 
                 this.current_rotation += this.rotatespeed * dt;
             }
-            if (40 in keysDown) {
+            if (GameInput.isDown('DOWN')) {
                 
+            }
+            if (GameInput.isDown('S')){
+                if(!slowmo_waiting_for_keyup) { //If key is not pressed / in released state .. we make sure
+                    do_slowmo = !do_slowmo; //Toggle
+                    slowmo_waiting_for_keyup = true; //and make usre we does not toggle untill next release and pressed again.
+                }
+            } else { 
+                slowmo_waiting_for_keyup = false;
+            }
+            if (GameInput.isDown('F')){
+                if(!frameskipp_waiting_for_keyup) { //If key is not pressed / in released state .. we make sure
+                    do_frameskipp = !do_frameskipp; //Toggle
+                    frameskipp_waiting_for_keyup = true; //and make usre we does not toggle untill next release and pressed again.
+                }
+            } else { 
+                frameskipp_waiting_for_keyup = false;
+            }
+            if (GameInput.isDown('C')){
+                if(!draw_collision_shapeswaiting_for_keyup) { //If key is not pressed / in released state .. we make sure
+                    do_draw_collision_shapes = !do_draw_collision_shapes; //Toggle
+                    draw_collision_shapeswaiting_for_keyup = true; //and make usre we does not toggle untill next release and pressed again.
+                }
+            } else { 
+                draw_collision_shapeswaiting_for_keyup = false;
+            }
+            if (GameInput.isDown('G')){
+                if(!use_gravity_waiting_for_keyup) { //If key is not pressed / in released state .. we make sure
+                    do_use_gravity = !do_use_gravity; //Toggle
+                    use_gravity_waiting_for_keyup = true; //and make usre we does not toggle untill next release and pressed again.
+                }
+            } else { 
+                use_gravity_waiting_for_keyup = false;
             }
 
             //Apply gravity
-            this.velocity.setY(this.velocity.getY() + (gravity*dt));
+            if (do_use_gravity) this.velocity.setY(this.velocity.getY() + (gravity*dt));
 
             //Apply air_friction
             //this.velocity = this.velocity.subV(this.velocity.mulS(air_friction/this.item_mas*dt)); //vel = vel - (vel*airfriction/mass) Higer speed mor break.. moer mass less break
@@ -454,9 +578,9 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
 
             /*Bounce worldwalls .*/
 
-                       
+            /*           
             if(this.pos.getX()+20 > WorldMap.width){
-                //this.velocity.setY(this.velocity.getY() - (this.velocity.getY() * ground_friction) ); //slide olong wall friction
+                this.velocity.setY(this.velocity.getY() - (this.velocity.getY() * ground_friction) ); //slide olong wall friction
                 if (this.velocity.getX() > 0) {this.velocity.getX(this.velocity.getX() - (this.velocity.getX() * absorb_constant) * dt); }
                 this.velocity.setX(this.velocity.getX() + ((WorldMap.width - (this.pos.getX()+20)) * bouncines ) * dt) ;
             }
@@ -465,7 +589,7 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
                 this.velocity.setX(this.velocity.getX() + (((0- (this.pos.getX()-20)) * bouncines ) * dt) );
             }
             if(this.pos.getY()+20 > WorldMap.height){
-                //this.velocity.setX(this.velocity.getX() - (this.velocity.getX() * ground_friction)); //slide olong wall friction
+                this.velocity.setX(this.velocity.getX() - (this.velocity.getX() * ground_friction)); //slide olong wall friction
                 if (this.velocity.getY() > 0) {this.velocity.setY(this.velocity.getY() - (this.velocity.getY() * absorb_constant) * dt); }
                 this.velocity.setY(this.velocity.getY() + ((WorldMap.height - (this.pos.getY()+20)) * bouncines ) * dt);
             }
@@ -473,10 +597,93 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
                 if (this.velocity.getY() < 0) {this.velocity.setY(this.velocity.getY() - (this.velocity.getY() * absorb_constant) * dt); }
                 this.velocity.setY(this.velocity.getY() + (((0- (this.pos.getY()-20)) * bouncines ) * dt) );
             }
+            */
+
+            //Now do collision checks .. 
+            //OBS OBS This will have to be moved to  world update loop later.. now we only uppdate tha player . but later when we have several world objects it makes sense to put collissiontests and such there.
+            //First uppdate collider pos.
+            this.colider.pos.x = this.pos.getX();
+            this.colider.pos.y = this.pos.getY();
+
+            /*********************************************************************************/
+            //
+            //Now check for collision . Only one other object so far.
+            //First .. clear resonse var
+            //This will be moved out to separate world colissionfunction .. but resides here for now just for speedy testing purposes.
+
+            //First version .. simple pull back player object so that collision no longer occur. -> adjust velocity
+            /**********************************************************************************/
+/*
+            this.response.clear();
+            this.collided = SAT.testPolygonCircle(box_polygonized, this.colider, this.response); //polygon , circle a bit faster than the other way around
+            if (this.collided) {
+                
+                //Now just move player out of collision .. ie asume other obect is "Heavy" and no bouncing .. just prevent overlapping .. -> should create sliding efect.
+                this.pos.setX(this.pos.getX()+this.response.overlapV.x);
+                this.pos.setY(this.pos.getY()+this.response.overlapV.y);
+                //Wooho .. works ... But now since we do not respond by anny physical force .. we have to make sure the velocuty stops .. at least in the direction that has to be puched out.
+                //SO
+                if(Math.abs(this.response.overlapV.x) > 0) { //ok .. if we are to be moved out of colision in anny x-dir .. stop motion in that Trying to set som smal val here so we do notr get stuck like if we almost is sliding . but just a litle bit has to be pulld out aliong .. ahh wait .. this might couse problems in slopes and such .. has to be experimentet on .
+                    //But for now .. test!!
+                    //this.velocity.setX(0);
+                    //console.log("current velX:" + this.velocity.getX() +"overlapX:" +this.response.overlapV.x);
+                    this.velocity.setX(this.velocity.getX()+(this.response.overlapV.x*2.5));
+
+
+                }
+                if(Math.abs(this.response.overlapV.y) > 0) { 
+                    //this.velocity.setY(0);
+                    this.velocity.setY(this.velocity.getY()+(this.response.overlapV.y*2.5));
+                }
+
+
+            }
+*/
+            /*****************************************/
+
+            //Second more physicaly correct version
+            //honors go to http://gamedevelopment.tutsplus.com/tutorials/how-to-create-a-custom-2d-physics-engine-the-basics-and-impulse-resolution--gamedev-6331
+            //Will push back player (or both obects later) along collision normal .. acording to restitution
+
+            /*****************************************/
+            for (var c = worldColliders.length - 1; c >= 0; c--) {
             
-        }
+                this.response.clear();
+                this.collided = SAT.testPolygonCircle(worldColliders[c], this.colider, this.response); //polygon , circle a bit faster than the other way around
+
+                if (this.collided) {
+                    console.log("collided");
+                    //Cals relative velocity In this case we know only player has vel . so rel_vel = player_vel .. should work in this case .. but make sure to take note of which obect is a and b .. since if we reverse the input in the coltest above this will shange ... since the normal wector will reverse.
+                    //AAArgh .. need to select what vector lib to use .. well well .. for this one .. create new Vec2D vector and use that since most values are in that now.
+                    //So use temp vector for normal-value
+                    
+                    //First correct for "sinking" error due to floatingpoint error
+                        this.generic_temp_vector.setAxes(this.response.overlapV.x,this.response.overlapV.y);                
+                        this.generic_temp_vector.multiplyByScalar(0.2);
+                        this.pos.add(this.generic_temp_vector); //perentage betwen 20 -80% shoud be ok
+
+                    //Now continue with calulated response
+                    this.generic_temp_vector.setAxes(this.response.overlapN.x,this.response.overlapN.y);
+                    var velAlongNormal = this.velocity.dot(this.generic_temp_vector);
+
+                    if (velAlongNormal < 0) {
+                        var bouncines = 0.2;
+                        //impulse scalar = -(1+bouncines) * velAlongNormal then / mas  but we have no mass yet .. so simplify
+                        //just use normal in temp vector to stor impulse..
+                        var t = -(1+bouncines)*velAlongNormal;
+                        this.generic_temp_vector.multiplyByScalar(-(1+bouncines)*velAlongNormal);
+
+                        //Now apply to vel.
+                        this.velocity.add(this.generic_temp_vector); //Now that shoul be it.
+
+                    }
+                }
+            };
+
+            
+        }//update() end
         
-    };
+    }; //Player end
     
 
     var Camera = {
@@ -551,15 +758,28 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
 
         //I'l need the folowing.
 
-        tilesize: 512, //not to small since we want to avoud to obvious patterns
+        tilesize: 512, //not to small since we want to avoid to obvious patterns
         nr_of_tiles: 3, //The hight and width of tilemap
         world_width_in_tile_cols : Math.floor(this.width/this.tilesize)+1, //one extra so we do not have empty space at the rightmost end.
         world_height_in_tile_rows : Math.floor(this.height/this.tilesize)+1, //one extra so we do not have empty space at the rightmost end.
 
 
+        /*
         background_canvas: document.createElement('canvas'), //There seam to bee the best solution to create a new document object .. a new canvas and work with that imagedata
         background_canvas_z2: document.createElement('canvas'), //second depth ..  further away from camera
         background_canvas_z3: document.createElement('canvas'), //next depth ..  even further away from camera
+        */
+        //Testing to see if we get performancegain by using in DOM elements thatare already specyfied in html instead of above
+        /*
+        It does affect some .. but not as much as I hoped .. will try to render smaler parts instead
+        Final conclusion: For some reason hardware acceleration was not avaliable asdefault in chrome fror ubuntu .. so I just changed one flag chrome://flags/ (the topmost value .. list of somethihg ..) and controlled after reboot of browser the haerdware accell was on via chrome://gpu/ and it also was imediatly back to normal speed .. 
+
+        */
+         background_canvas: document.getElementById('bg-canvas1'),
+         background_canvas_z2: document.getElementById('bg-canvas2'),
+         background_canvas_z3: document.getElementById('bg-canvas3'),
+
+
         background_canvas_z2_size: 0.5, //a value betwen 0-1 where 0 i infinity far away and will not move at all all 1 is in face and will mov as standrard bg.
         background_canvas_z3_size: 0.1, //should be smaler than 2
         bg_tilemap: new Array(),  //Those will tell witch tiles will be where in the world.
@@ -772,21 +992,61 @@ for(iy=0; iy<(WorldMap.world_height_in_tile_rows); iy++){ //each row
 
     var gravity = 9.8 *40; //  10Px = 1m -> 98px/sec
     var air_friction = 0.53; //
+    var do_slowmo = false;
+    var slowmo_factor = 0.2; // 1 no slowmo -- 0.1 much slowmo  
+    var slowmo_waiting_for_keyup = false;
+    var do_frameskipp = false;
+    var frameskipp_waiting_for_keyup = false;
+    var do_draw_collision_shapes = false;
+    var draw_collision_shapeswaiting_for_keyup = false;
+    var do_use_gravity = false;
+    var use_gravity_waiting_for_keyup = false;
+    var debugg_text = "";
 
-    var keysDown = {};
-    window.addEventListener('keydown', function(e) {
-        keysDown[e.keyCode] = true;
+
+    // Don't run the game when the tab isn't visible
+    window.addEventListener('focus', function() {
+        unpause();
     });
-    window.addEventListener('keyup', function(e) {
-        delete keysDown[e.keyCode];
+
+    window.addEventListener('blur', function() {
+        pause();
     });
-     
+
+    // Functions ---
+
+
+    // Reset game to original state
+    function reset() {
+       /* player.x = 0;
+        player.y = 0;
+        */
+        Player.init();
+
+        //Now just for testing purposes create a floating colider block somewhare on screen.
+        
+    }
+
+    // Pause and unpause
+    function pause() {
+        running = false;
+    }
+
+    function unpause() {
+        running = true;
+        time = Date.now();
+        //main(); //No need to call main again since we nevver stip that req-anim loop.  we just does not do annything in it if paused 
+    }
+   
     function update(dt) {
         
         //Create several step simulation
         var max_simulation_timestep = 0.002;
         var iterations = Math.round(dt/max_simulation_timestep)+1;
         var dt_part = dt/iterations;
+        
+        if(do_slowmo){ dt_part *= slowmo_factor; }
+
         for (it=0; it< iterations; it++) {
             Player.update(dt_part);
         }
@@ -798,24 +1058,55 @@ for(iy=0; iy<(WorldMap.world_height_in_tile_rows); iy++){ //each row
         //Clear canvas
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = Player.color;
-
+        
         //Update cam position/focus.
         Camera.recalibrate_focus();
 
         //Render world and background
-        //ctx.drawImage(WorldMap.background_canvas, 0, 0);
         //WorldMap.render_from_fullimage();
-        WorldMap.render_from_randomized_tiles();
+         WorldMap.render_from_randomized_tiles();
+
+        //Render other world objects.  like tiles and opponents .. but . for now just throw it in here
+        for(i=0;i<worldColliders.length;i++){
+
+
+            ctx.fillStyle = 'red';
+            ctx.strokeStyle="red";
+            ctx.lineWidth=1;
+            temp_vec.setX(worldColliders[i].pos.x);
+            temp_vec.setY(worldColliders[i].pos.y);
+            Camera.world_to_relative_pos(temp_vec, temp_vec2);
+            
+            ctx.beginPath();
+            ctx.moveTo(temp_vec2.getX(),temp_vec2.getY());
+            
+            var points = worldColliders[i].calcPoints;
+            for (var j = 1; j < points.length; j++) {
+             ctx.lineTo(temp_vec2.getX() + points[j].x, temp_vec2.getY() + points[j].y);
+            }
+
+            //aaand close it
+            //ctx.lineTo(temp_vec2.getX(),temp_vec2.getY());
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.stroke();
+        }
+
+        //ctx.fillRect(temp_vec2.getX()-(box.w), temp_vec2.getY()-(box.h), box.w, box.h); //HMM converted box to poly might not have width
+
+       
         //Render All items and player
-        //ctx.fillRect(Player.pos.getX(), Player.pos.getY(), Player.width, Player.height);
         Player.render(dt);
 
+        //
+        if (do_draw_collision_shapes) {debugg_text = "Drawing collision-shapes";} else {debugg_text = "";}
         //Render framerate.
         ctx.fillStyle = '#0f0';
         ctx.fillText("Framerate: "+ framerate +"/s ", 10, 10);
         ctx.fillText("Time/Last: "+ (time - last), 10, 20);
         ctx.fillText("Framecount: "+ framecount +"/s ", 10, 30);
+        ctx.fillText("DebugText: "+ debugg_text +"", 10, 40);
 
         
     }
@@ -838,16 +1129,19 @@ for(iy=0; iy<(WorldMap.world_height_in_tile_rows); iy++){ //each row
     }
 
     function main() {
-     
+        
+        requestAnimFrame(main);
+        
         if(!running) {
             return;
         }
-        //skip = !skip;
+
+        if (do_frameskipp) skip = !skip;  //To only run at 30 fps.
         if (skip) {
             run();
         }
         
-        requestAnimFrame(main);
+        
     }
 
     var time = Date.now();
@@ -855,10 +1149,42 @@ for(iy=0; iy<(WorldMap.world_height_in_tile_rows); iy++){ //each row
     var last = time;
     var running = true;
     //Set some game-global vars .. Maybe move those later .. but for now
-    var bouncines = 780; //
-    var absorb_constant = 30
-    var ground_friction = 0.01;
+    var bouncines = 1280; //
+    var absorb_constant = 40
+    var ground_friction = 0.02;
     var skip = true;
+    var temp_vec = Vec2D.create(0,0);
+    var temp_vec2 = Vec2D.create(0,0);
+    //var box;
+    //var box_polygonized;
+
+    //Ok .. now verry ugly solution to world geometry ..for collissiontesting.
+
+    //First create outer bounds for world
+    var WorldWallTop = new SAT.Box(new SAT.Vector(0,0), WorldMap.width,1); //top wall
+    var WorldWallTop_polygonized = WorldWallTop.toPolygon();
+    
+    var WorldWallBottom = new SAT.Box(new SAT.Vector(0,WorldMap.height-1), WorldMap.width,WorldMap.height); //bottom wall
+    var WorldWallBottom_polygonized = WorldWallBottom.toPolygon();
+    
+    var WorldWallLeft = new SAT.Box(new SAT.Vector(0,0), 1,WorldMap.height); //left wall
+    var WorldWallLeft_polygonized = WorldWallLeft.toPolygon();
+    
+    var WorldWallRight = new SAT.Box(new SAT.Vector(WorldMap.width-1,0), WorldMap.width,WorldMap.height); //right wall
+    var WorldWallRight_polygonized = WorldWallRight.toPolygon();
+    
+
+
+
+    //Some obstacles to navigate around
+    var box = new SAT.Box(new SAT.Vector(400,400), 300,30);
+    var box_polygonized = box.toPolygon();
+        box_polygonized.rotate(20 * Math.PI/180);
+
+    var box2 = new SAT.Box(new SAT.Vector(650,500), 300,30);
+    var box2_polygonized = box2.toPolygon();
+        box2_polygonized.rotate(-20 * Math.PI/180);
+    var worldColliders = [box_polygonized,box2_polygonized, WorldWallTop_polygonized, WorldWallBottom_polygonized, WorldWallLeft_polygonized, WorldWallRight_polygonized];
 
     //Some temp vars used in rotation calc.. 
     var t_radians;
@@ -867,6 +1193,8 @@ for(iy=0; iy<(WorldMap.world_height_in_tile_rows); iy++){ //each row
     var t_nx;
     var t_ny;
 
+    //Now start th game
+    reset();
     main();
 
 
@@ -890,16 +1218,22 @@ for(iy=0; iy<(WorldMap.world_height_in_tile_rows); iy++){ //each row
 //Todo
 /*********************************************
 
-* Switch from crappy vectorcode to one of the folowing candidates
-glmatrix-version , vector2d on npm, vectors from three or from mathlib used by  Canvas3D on kevs3d.co.uk
-I would realy like to be able to use vecto.getY() and .getY() referece since that make the code so mych simler to read .. when doing bounce and collision calculation stuff.
+Add prorteies box so I can ajust vals during play. to test.
 
-*Really need to organise the code and thin thru what stuct I vill have on objecs.. 
-    Can I have more then one plauer camera  and so on.. probably if I wil be able to switch viacles and so. 
+*Switch to pixi.js  seam to be a strong lib for doing graphics. But JUST MAYBE.. will have to evaluate if it is needed .. seam to exist some nice javascript gamelibs that doesnot need that to render fast .. 
+and using it for speed up tile-rendering for example will slow down if it has to fall back on canvas .. 
+So .. eveluate the folowing first.
+http://gamejs.org/
+https://github.com/grapefruitjs/grapefruit
+And obove all http://melonjs.github.io/ SEAM VERRY NICE
+Both have nice working tilemanagement fast and all.
 
+
+*Really need to organize the code and think thru what stuct I vill have on objecs.. 
+    Can I have more then one player camera  and so on.. probably if I will be able to switch viacles and so. 
 
 *Add gravityswitch
-
+*
 *Colission handler. Use this later.
 if (object1.getX() < object2.getX() + object2.width  && object1.getX() + object1.width  > object2.getX() &&
         object1.getY() < object2.getY() + object2.height && object1.getY() + object1.height > object2.getY()) {
@@ -942,13 +1276,21 @@ return NOT (
 
 //Done
 /*********************************************
+*Add slowmotion function .. 
+
+*Added input-lib to separate file.
+
+* Switch from crappy vectorcode to one of the folowing candidates
+glmatrix-version , vector2d on npm, vectors from three or from mathlib used by  Canvas3D on kevs3d.co.uk
+I would realy like to be able to use vecto.getY() and .getY() referece since that make the code so mych simler to read .. when doing bounce and collision calculation stuff.
+ADDED Vec2D lib .. but still using none of its functions except rotation.. 
 
 *add posibility to use img instead of just squares.
 
-*Finish cameromode with camera_slak and all
-*Change rotationfuntion to store curretn rotation so that sipler rotation can be done.  not rotate 0.0001 deg each time .. instead .. add 0,001 deg to rotation and then rotate round(current rotation)  No point in actualy swith to lookuptables for sin and cos .. current javascript func acually faster
+*Finish cameromode with camera_slack and all
+*Change rotationfunction to store curretn rotation so that simpler rotation can be done.  not rotate 0.0001 deg each time .. instead .. add 0,001 deg to rotation and then rotate round(current rotation)  No point in actualy swith to lookuptables for sin and cos .. current javascript func acually faster
 
-*Particle-engine. Will I relly loop though all particles once for pos-update and then once more for render.. or will I be able to update pos and at the same time render to some temp-canvas thet later will be reder alla t once as one bitmap.  --> called from render-func in player .. and both phys update and render.. since it unlikely it will interact with other parts of game
+*Particle-engine. Will I relly loop though all particles once for pos-update and then once more for render.. or will I be able to update pos and at the same time render to some temp-canvas that later will be redered all at once as one bitmap.  --> called from render-func in player .. and both phys update and render.. since it unlikely it will interact with other parts of game
 
 Tile world adn br to avoid those enourmous bitmaps
 
@@ -966,5 +1308,8 @@ Tile world adn br to avoid those enourmous bitmaps
 </head>
 <body>
     <canvas id="canvas"></canvas>
+    <canvas id="bg-canvas1" style="display:none;"></canvas>
+    <canvas id="bg-canvas2" style="display:none;"></canvas>
+    <canvas id="bg-canvas3" style="display:none;"></canvas>
 </body>
 </html>

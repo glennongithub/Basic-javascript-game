@@ -1,11 +1,15 @@
 <html>
 <head>
-<script src="vec2d.js" type="text/javascript"></script>
+<script type="text/javascript" src="includes/vec2d.js"></script>
+<script type="text/javascript" src="includes/input.js"></script>
+<script type="text/javascript" src="includes/SAT.js"></script>
+<script type="text/javascript" src="includes/dat.gui.min.js"></script>
 <script>
 /*
-V6 - 
-switching to npm vector2d lib .. it seam to be fast and fullfill all my requirements. *
-Not so much work .. only change all new Vec2 to Vec2D.crete .. and fix so we feed radians inte rotate function .. lib does not have rotate by angle.. Maybe I fix .. or just multiply by PI/180 everywhere its needed
+V10
+Added planet and planetary gravitation
+Todo: reorganice stuff for easyer reading.
+
 
 /
 
@@ -98,6 +102,13 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
     this.exit_vel_tolerance = 50; //Float .. +/- px/sec it could dif .. will be randomized
     this.next_particle_to_activate = 0; //this will lop trough array of particles..
     this.is_emitting = false; //This will be set directly or via method I will crate later.
+    this.colider_radius = 1; //To use both when creating colider shape and debugger vissible circle
+    this.colider = new SAT.Circle(); //No values . overriding those later in init().
+    this.colided = false; //will be used to se if we collided or not.
+    this.response = new SAT.Response(); //Will contain overlap and overlapV  wich is total overlap .. and the exact directional vector to stop overlap. 
+    this.generic_temp_vector = Vec2D.create(0,0);
+    this.temp_velAlongNormal = 0;
+    this.bouncines = 0.2; //
     
     this.last_time_count = 0; //The count will be counted down with dt for each passage
     this.init = function() {
@@ -110,6 +121,8 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
                 live: false
             };
         }
+     	//one colider used for all particles
+     	this.colider = new SAT.Circle(new SAT.Vector(1, 1), this.colider_radius ); //Just put it in the top-left corner to start with
 
     };
 
@@ -117,6 +130,7 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
     this.update_and_draw = function(dt) {
         //Emit new particles maybe.
         //count down last_time_count
+        if(worldconfig.do_slowmo){ dt *= worldconfig.slowmo_factor; }
         this.last_time_count -= dt;  //Putting this here will make it posible to start emitting dirrectly ... while if putting this cound-down after  is_emittin-test .. it will really always be minimum the intervall timeout between emits.
         //If is emitting
         if(this.is_emitting == true) {
@@ -124,7 +138,7 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
             //console.log("last_time_count:"+ this.last_time_count  +"Intervall = "+this.emit_interval+" dt:"+dt);
             if(this.last_time_count <= 0) { //new particle is to be emitted
                 
-                //First controll how manny that should have been emitted since lat time .. (if short intervall it migt be more then one)
+                //First controll how manny that should have been emitted since last time .. (if short intervall it migt be more then one)
                 if(Math.abs(this.last_time_count) > this.emit_interval) {//if we passed more than one intervall since last time
                     parts_to_create  = ~~(Math.abs(this.last_time_count)/this.emit_interval); //fastest way to do integer division acording to http://stackoverflow.com/questions/4228356/integer-division-in-javascript
                     this.last_time_count = this.emit_interval + this.last_time_count%this.emit_interval;  //% give reminder ov div .. witch shall be subtracted from intervall resett time
@@ -188,49 +202,59 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
                 /*Cheating by not doing the iterations loop .. only do once*/
                 /*By experience this will result in more unstable simulation and will force us to ajust repulse-forces and such to behave acceptable*/
                 /*But still if it looks ok it will be a resanable tradeof*/
-                dt_part = dt;
+                dt_part = dt;  //uncomment this if we cheat.
 
-                /*for (it=0; it< iterations; it++) {*/
+                //for (it=0; it< iterations; it++) { //Comment this loop end its end to cheat
                     
                 
                     //Apply gravity
-                    this.particles[i].vel.setY(this.particles[i].vel.getY() + (gravity *dt_part) ) ;
+                    this.particles[i].vel.setY(this.particles[i].vel.getY() + (worldconfig.gravity *dt_part) ) ;
                     
                     //Test performance-hit if we bounce each particle against world-wall
-                    /*Bounce worldwalls .*****************************/
-                    /*************************************************/
                     
-                    
-                    if(this.particles[i].pos.getX()+4 > WorldMap.width){
-                        //save vel for use after reseting it
-                        //Apply frictionforce along wall axis 
-                        this.particles[i].vel.setY(this.particles[i].vel.getY() - (this.particles[i].vel.getY() * ground_friction));
-                        //absorb vel by  val but only if moving into the wall not when already pushed enough to move away
+                   	/************************************************/
+                   	
+                    //Testing same advanced physical bouncing as player for all particles..just to se how much performance it eats.
+                   	for (var c = worldColliders.length - 1; c >= 0; c--) {
+            
+		                this.response.clear();
+		                this.colider.pos.x = this.particles[i].pos.getX(); //Set colider to current particle pos
+		                this.colider.pos.y = this.particles[i].pos.getY(); //Set colider to current particle pos
+		                this.collided = false;
+		                this.collided = SAT.testPolygonCircle(worldColliders[c], this.colider, this.response); //polygon , circle a bit faster than the other way around
 
-                        //If particle moving into the wall absorb some of its energy
-                        if (this.particles[i].vel.getX() > 0) {this.particles[i].vel.setX(this.particles[i].vel.getX() - ((this.particles[i].vel.getX() * absorb_constant) * dt_part)) ; }
-                       
-                        //Now repulse
-                        this.particles[i].vel.setX(this.particles[i].vel.getX() + ((WorldMap.width - (this.particles[i].pos.getX()+4)) * bouncines ) * dt_part ) ;
-                    }
+		                if (this.collided) {
+		                    //console.log("collided");
+		                    //Cals relative velocity In this case we know only player has vel . so rel_vel = player_vel .. should work in this case .. but make sure to take note of which obect is a and b .. since if we reverse the input in the coltest above this will shange ... since the normal wector will reverse.
+		                    //AAArgh .. need to select what vector lib to use .. well well .. for this one .. create new Vec2D vector and use that since most values are in that now.
+		                    //So use temp vector for normal-value
+		                    
+		                    //First correct for "sinking" error due to floatingpoint error
+		                        this.generic_temp_vector.setAxes(this.response.overlapV.x,this.response.overlapV.y);                
+		                        this.generic_temp_vector.multiplyByScalar(0.2);
+		                        this.particles[i].pos.add(this.generic_temp_vector); //perentage betwen 20 -80% shoud be ok
 
-                    //Do coresponding to rest of walls to
-                    if(this.particles[i].pos.getX()-4 < 0){
-                        if (this.particles[i].vel.getX() < 0) {this.particles[i].vel.setX(this.particles[i].vel.getX() - ((this.particles[i].vel.getX() * absorb_constant) * dt_part)); }
-                        this.particles[i].vel.setX(this.particles[i].vel.getX() + ((0-(this.particles[i].pos.getX()-4)) * bouncines ) * dt_part);
-                    }
-                    if(this.particles[i].pos.getY()+4 > WorldMap.height){
-                        this.particles[i].vel.setX(this.particles[i].vel.getX() - (this.particles[i].vel.getX() * ground_friction));
-                        if (this.particles[i].vel.getY() > 0) {this.particles[i].vel.setY(this.particles[i].vel.getY() - ((this.particles[i].vel.getY() * absorb_constant) * dt_part)) ; }
-                        this.particles[i].vel.setY(this.particles[i].vel.getY() + ((WorldMap.height - (this.particles[i].pos.getY()+4)) * bouncines ) * dt_part ) ;
-                    }
-                    if(this.particles[i].pos.getY()-4 < 0){
-                        if (this.particles[i].vel.getY() < 0) {this.particles[i].vel.setY(this.particles[i].vel.getY() - ((this.particles[i].vel.getY() * absorb_constant) * dt_part)); }
-                        this.particles[i].vel.setY(this.particles[i].vel.getY() + ((0-(this.particles[i].pos.getY()-4)) * bouncines ) * dt_part);
-                    }
+		                    //Now continue with calulated response
+		                    this.generic_temp_vector.setAxes(this.response.overlapN.x,this.response.overlapN.y);
+		                    this.temp_velAlongNormal = this.particles[i].vel.dot(this.generic_temp_vector);
+
+		                    if (this.temp_velAlongNormal < 0) {
+		                        //impulse scalar = -(1+bouncines) * velAlongNormal then / mas  but we have no mass yet .. so simplify
+		                        //just use normal in temp vector to stor impulse..
+		                        this.generic_temp_vector.multiplyByScalar(-(1+this.bouncines)*this.temp_velAlongNormal);
+
+		                        //Now apply to vel.
+		                        //this.velocity.add(this.generic_temp_vector); //Now that shoul be it.
+		                        this.particles[i].vel.add(this.generic_temp_vector);
+
+		                    }
+		                }
+            		};
                     
-                    /************************************************/
-                    /************************************************/
+
+
+                   	/*************************************************/
+
 
                     //Do the actual move
                     //this.particles[i].pos = this.particles[i].pos.addV(this.particles[i].vel.mulS(dt_part));
@@ -239,7 +263,7 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
                     this.particles[i].pos.setY(this.particles[i].pos.getY() + (this.particles[i].vel.getY() * dt_part) ) ;
 
 
-                /*};*/
+                //}; /*REM away this loop to cheat*/
 
                 //render to cam-coordinates
                 //ctx.fillRect(Camera.world_to_relative_pos(this.particles[i].pos).getX(), Camera.world_to_relative_pos(this.particles[i].pos).getY(), 1, 1);
@@ -252,7 +276,10 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
                 ctx.fillStyle = 'rgba(' + 250 + ',' + 200 + ',' + 10 + ',' + ( 1- (this.particles[i].age/this.maxage)) + ')';
                 //ctx.fillStyle = 'rgba(' + 250 + ',' + 200 + ',' + 10 + ',' + ( 1) + ')';
                 //ctx.fillStyle = 'rgba(' + 200 + ',' + 30 + ',' + 10 + ',' + 0.5 + ')';
-                ctx.fillRect(tmp_vec.getX()-2, tmp_vec.getY()-2, 4, 4);  //ajust pos to with of particle size  size= 4 pos -2
+                //ctx.fillRect(tmp_vec.getX(), tmp_vec.getY(), 1, 1);  //partsize 1px
+                //ctx.fillRect(tmp_vec.getX()-1, tmp_vec.getY()-1, 2, 2);  //partsize 2px
+                ctx.fillRect(tmp_vec.getX()-1, tmp_vec.getY()-1, 3, 3);  //partsize 3px
+                //ctx.fillRect(tmp_vec.getX()-2, tmp_vec.getY()-2, 4, 4);  //partsize 4px
                 
                 //update age
                 this.particles[i].age += dt; //ad dt to age. 
@@ -281,16 +308,36 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
         rotatespeed: 300 * (Math.PI / 180), //In degees per second
         current_rotation: 0,
         velocity: Vec2D.create(0,0),
+        accel: Vec2D.create(0,0),
+        old_velocity: Vec2D.create(0,0), //this is to try method described at http://lolengine.net/blog/2011/12/14/understanding-motion-in-games. NOT USED NOW
         color: '#c00',
         dir_v2: Vec2D.create(1,0), //This is ower-written in update since we recalc rotation from start rot that we set there .. TODO .. rethingk where this should be handeled
-        item_mas: 1, //The mass of item .. will effect force aplied to it.
+        item_mass: 1, //The mass of item .. will effect force aplied to it.
         trust: 700,
         rell_pos : Vec2D.create(0,0),
         avatar_verts: [Vec2D.create(-15,15),Vec2D.create(0,-15),Vec2D.create(15,15)],  //This is vectors that when draw a line from first to last creates the avatar representing the same pos as start rotation
         temp_avatar_verts: [Vec2D.create(-5,5),Vec2D.create(0,-5),Vec2D.create(5,5)], //To be able to rotate above withoute owerwrite original state.
         generic_temp_vector:Vec2D.create(0,0),
-        pemiter : new particelemitter(200, Vec2D.create(200,200), 300.1, 0.5, 200), //nrofparticles, pos, vel in px per sec, maxage, particles_per_second
+        generic_temp_var: 0,
+        temp_length: 0,
+        temp_dir: 0,
+        temp_force: 0,
+        pemiter : new particelemitter(1000, Vec2D.create(200,200), 300.1, 0.5, 200), //nrofparticles, pos, vel in px per sec, maxage, particles_per_second
         pemiter_rel_to_player_pos: Vec2D.create(0,15),
+        //Now try to add a colider shape. We start with a circle..
+        //It will not be auto rendered by SAT-js so we have  to handle that oursefes .. of course.
+        colider_radius :15, //To use both when creating colider shape and debugger vissible circle
+        colider: new SAT.Circle(), //No values . overriding those later in init().
+        colided: false, //will be used to se if we collided or not.
+        response: new SAT.Response(), //Will contain overlap and overlapV  wich is total overlap .. and the exact directional vector to stop overlap. 
+        velAlongNormal : 0,
+        bouncines : 0.2,
+        init: function () {
+            //Do everything needed to initiate player .. 
+            //Now when adding SAT col det .. we have to create collider shape
+            this.colider = new SAT.Circle(new SAT.Vector(this.pos.getX(), this.pos.getY()), this.colider_radius );
+
+        },
         render: function (dt) {
             //Now render players relative pos to camera
             //Here we can choose to render the iten/player in various ways . depending on functionality we like to have
@@ -302,47 +349,20 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
             //Cros-hair: print dot 20 px from player center in forward dir
             ctx.fillStyle = '#0c0';
             ctx.fillRect(this.rell_pos.getX() + this.dir_v2.getX() * 30, this.rell_pos.getY() + this.dir_v2.getY() * 30, 1, 1);
+
+            //Draw collision-shape if that is set.
+            if (worldconfig.do_draw_collision_shapes) {
+                ctx.beginPath();
+                ctx.arc(this.rell_pos.getX(),this.rell_pos.getY(), this.colider_radius, 0, 2 * Math.PI );
+                ctx.strokeStyle = "red";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+            }
             
 
 
-            //Rendermethod 2: try to draw som lines betwen dots.
-            //Rotate avatar dots 
-            /*
-            ctx.beginPath();
-            ctx.strokeStyle="red";
-            ctx.lineWidth=5;
-            var draw_started = false;
-            for(i=0;i<this.avatar_verts.length; i++)
-            {
-                //Clone it 
-                this.temp_avatar_verts[i].setX(this.avatar_verts[i].getX()) ;
-                this.temp_avatar_verts[i].setY(this.avatar_verts[i].getY()) ;
-                //Then rotate temp
-                this.temp_avatar_verts[i].rotate((this.current_rotation)); 
-
-                //Calc relworldpos
-                //this.temp_avatar_verts[i] = Camera.world_to_relative_pos(this.pos.addV(this.temp_avatar_verts[i]));
-                //Manual one by one instead of above
-                this.generic_temp_vector.setX(this.pos.getX() + this.temp_avatar_verts[i].getX());
-                this.generic_temp_vector.setY(this.pos.getY() + this.temp_avatar_verts[i].getY());
-                Camera.world_to_relative_pos(this.generic_temp_vector, this.temp_avatar_verts[i]);
-
-                //Print dots to world
-                ctx.fillStyle = '#fff';
-                //ctx.fillRect(this.temp_avatar_verts[i].getX() , this.temp_avatar_verts[i].getY(), 1, 1);
-
-                if(!draw_started) { 
-                    ctx.moveTo(this.temp_avatar_verts[i].getX() , this.temp_avatar_verts[i].getY()); 
-                    draw_started = true;
-                } else {
-                    ctx.lineTo(this.temp_avatar_verts[i].getX() , this.temp_avatar_verts[i].getY());
-                }
-
-            }
-            ctx.stroke();
-            */
-
-            //Render as image
+           //Render as image
             
              Camera.world_to_relative_pos(this.pos, this.rell_pos);
 
@@ -352,18 +372,14 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
             ctx.drawImage(rocket_Img, 0, 0, rocket_Img.width,rocket_Img.height,-(Math.round(this.width/2)),-(Math.round(this.height/2)),this.width,this.height); 
             ctx.rotate( -( this.current_rotation));
             ctx.translate(-Math.round(this.rell_pos.getX()), -Math.round(this.rell_pos.getY()));
+
             
 
 
             //Render Particles
-            //First make sure emitter is possitioned exaktly where we want it..
+            //First make sure emitter is possitioned exactly where we want it..
 
-            //Can be done in 2 way .. easy way first
-            //Center it to Player
-            //this.pemiter.emitter_pos.setX(this.pos.getX());
-            //this.pemiter.emitter_pos.setY(this.pos.getY());
-
-            //Or mor flexible: Use a specific pos relative to player set in params above
+            //Use a specific pos relative to player set in params above
             //and borow avatar temp vec to rotate it right. If we knew that pos will be in line plyer direction .. we could use same method as croshair above
 
             //Clone it 
@@ -378,7 +394,7 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
             this.temp_avatar_verts[1].setY(this.temp_avatar_verts[1].getY() + this.pos.getY())  ;
 
 
-            //Soo now set emitter_ps to that
+            //Soo now set emitter_pos to that
             this.pemiter.emitter_pos.setX(this.temp_avatar_verts[1].getX()) ;
             this.pemiter.emitter_pos.setY(this.temp_avatar_verts[1].getY()) ;
 
@@ -392,20 +408,52 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
             
 
         },
+        /**
+         * [update description]
+         * @param  {[type]} dt
+         * @return {[type]}
+         */
+        
         update: function(dt) {
+
+
+
+            /*
+            This whole function will be rewritten and exploded to separate functions as follows
+            update_input_forces() /will update new vector accel acording input  and also rotation .. hm hav to think thi thru
+            update_other_forces()  //will update new vector accel  acording to exernalforces like gravity and other ..??
+            simulate()  //Will do 
+                update pos with halfstep with old not updated vel vector -> dt * 0.5
+                update vel acording to forces in accel vector with full dt
+                update pos with halfstep with new updated vel vector -> dt * 0.5
+            check_for_coll()
+                check for col with world objects and resolve
+                check for col with other players enemies and such bullets .. objects and fire event if needed
+    
+            
+            */
+            
+
+            //Before starting modifying forces .. resett them
+            this.accel.setX(0);
+            this.accel.setY(0);
+            /******************************************************************/
+            /* Update input forces 
+            /* might be moved out to update_input_forces() function of this obj
+            /* 
+            /*******************************************************************/
             
             /*read keys and set force*/
-            if (37 in keysDown) {
+            if (GameInput.isDown('LEFT')) {
                 
                 this.current_rotation -= this.rotatespeed * dt;
             }
 
-            if (38 in keysDown) { //Forward = add force to 
+            if (GameInput.isDown('UP')) { //Forward = add force to 
+
                 //Add rocketforce
-                //this.velocity = this.velocity.addV(this.dir_v2.mulS(dt*this.trust/this.item_mas));
-                //One by one instead of obove
-                this.velocity.setX(this.velocity.getX() + this.dir_v2.getX() * (this.trust/this.item_mas) * dt);
-                this.velocity.setY(this.velocity.getY() + this.dir_v2.getY() * (this.trust/this.item_mas) * dt);
+                this.accel.setX(this.accel.getX() + this.dir_v2.getX() * (this.trust/this.item_mass) );
+                this.accel.setY(this.accel.getY() + this.dir_v2.getY() * (this.trust/this.item_mass) );
                 //Turn on emitter
                 this.pemiter.is_emitting = true;
             } else {
@@ -413,23 +461,13 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
                 this.pemiter.is_emitting = false;
             }
 
-            if (39 in keysDown) {
+            if (GameInput.isDown('RIGHT')) {
                 
                 this.current_rotation += this.rotatespeed * dt;
             }
-            if (40 in keysDown) {
+            if (GameInput.isDown('DOWN')) {
                 
             }
-
-            //Apply gravity
-            this.velocity.setY(this.velocity.getY() + (gravity*dt));
-
-            //Apply air_friction
-            //this.velocity = this.velocity.subV(this.velocity.mulS(air_friction/this.item_mas*dt)); //vel = vel - (vel*airfriction/mass) Higer speed mor break.. moer mass less break
-            //One by one instead of obove
-            this.velocity.setX(this.velocity.getX() - this.velocity.getX() * (air_friction/this.item_mas) * dt);
-            this.velocity.setY(this.velocity.getY() - this.velocity.getY() * (air_friction/this.item_mas) * dt);
-
             //Update dir_v2 acording to current_rotation
             //Rotate from startpos straight up .. meenig resett so ve rotate from that.
             this.dir_v2.setX(0); 
@@ -437,46 +475,163 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
 
             this.dir_v2.rotate(this.current_rotation);
 
-            
-            //Now update possition
-            //this.pos = this.pos.addV(this.velocity.mulS(dt));
-            //One by one instead of above
-            this.pos.setX(this.pos.getX() + this.velocity.getX() *dt) ;
-            this.pos.setY(this.pos.getY() + this.velocity.getY() *dt) ;
 
-            /*warp world*/
-            /*
-            if(this.pos.getX() > WorldMap.width){this.pos.getX() = this.pos.getX() - WorldMap.width; }
-            if(this.pos.getX() < 0){this.pos.getX() = this.pos.getX() + WorldMap.width; }
-            if(this.pos.getY() > WorldMap.height){this.pos.getY() = this.pos.getY() - WorldMap.height; }
-            if(this.pos.getY() < 0){this.pos.getY() = this.pos.getY() + WorldMap.height; }
-            */
 
-            /*Bounce worldwalls .*/
 
-                       
-            if(this.pos.getX()+20 > WorldMap.width){
-                //this.velocity.setY(this.velocity.getY() - (this.velocity.getY() * ground_friction) ); //slide olong wall friction
-                if (this.velocity.getX() > 0) {this.velocity.getX(this.velocity.getX() - (this.velocity.getX() * absorb_constant) * dt); }
-                this.velocity.setX(this.velocity.getX() + ((WorldMap.width - (this.pos.getX()+20)) * bouncines ) * dt) ;
-            }
-            if(this.pos.getX()-20 < 0){
-                if (this.velocity.getX() < 0) {this.velocity.setX(this.velocity.getX() - (this.velocity.getX() * absorb_constant) * dt); }
-                this.velocity.setX(this.velocity.getX() + (((0- (this.pos.getX()-20)) * bouncines ) * dt) );
-            }
-            if(this.pos.getY()+20 > WorldMap.height){
-                //this.velocity.setX(this.velocity.getX() - (this.velocity.getX() * ground_friction)); //slide olong wall friction
-                if (this.velocity.getY() > 0) {this.velocity.setY(this.velocity.getY() - (this.velocity.getY() * absorb_constant) * dt); }
-                this.velocity.setY(this.velocity.getY() + ((WorldMap.height - (this.pos.getY()+20)) * bouncines ) * dt);
-            }
-            if(this.pos.getY()-20 < 0){
-                if (this.velocity.getY() < 0) {this.velocity.setY(this.velocity.getY() - (this.velocity.getY() * absorb_constant) * dt); }
-                this.velocity.setY(this.velocity.getY() + (((0- (this.pos.getY()-20)) * bouncines ) * dt) );
+            /******************************************************************/
+            /* Update other forces 
+            /* might be moved out to update_other_forces() function of this obj
+            /* 
+            /*******************************************************************/
+
+            //Apply gravity
+            if (worldconfig.do_use_gravity) this.accel.setY(this.accel.getY() + (worldconfig.gravity));
+
+            //Apply air_friction force
+            if (worldconfig.do_use_airfriction) {
+                this.accel.setX(this.accel.getX() - this.velocity.getX() * (worldconfig.air_friction/this.item_mass));
+                this.accel.setY(this.accel.getY() - this.velocity.getY() * (worldconfig.air_friction/this.item_mass));
             }
             
-        }
+
+            //Apply planetary gravitation.
+            //var d = this.pos.sub(p2.c)
+            if (worldconfig.do_use_planet_gravity) {
+	            this.generic_temp_vector.setX(this.pos.getX()-planet.pos.getX());
+	            this.generic_temp_vector.setY(this.pos.getY()-planet.pos.getY());
+	            //var length = d.length()+10
+	            this.temp_length = this.generic_temp_vector.length()+10; //add som lengt so it never close to 0
+
+	            //var dir = d.normalize()
+	            this.generic_temp_vector = this.generic_temp_vector.normalize();
+	            
+	            //var force = gravityconstant * ((this.item_mass * planet.mass)/(length*length)  )
+	            this.temp_force = worldconfig.gravityconstant * ((this.item_mass * planet.mass)/(this.temp_length*this.temp_length));
+	            //console.log(this.temp_length);
+
+	            //p.a.set(p.a.sub(dir.mul(force / p.m )))
+	            this.accel.setX(this.accel.getX() -(this.generic_temp_vector.getX() * this.temp_force / this.item_mass));
+	            this.accel.setY(this.accel.getY() -(this.generic_temp_vector.getY() * this.temp_force / this.item_mass));
+            	//console.log(this.temp_force);
+        	}
+  
+
+            
+
+
+
+            /******************************************************************/
+            /* Simulate
+            /* might be moved out to simulate() function of this obj
+            /* 
+            /*******************************************************************/
+            
+            //First thing.  Halfstep pos with old values
+            this.pos.setX(this.pos.getX() + this.velocity.getX()  * dt * 0.5) ; 
+            this.pos.setY(this.pos.getY() + this.velocity.getY()  * dt * 0.5) ;
+
+            //Now update vel vector witch accel forces acording to full timestep
+            this.velocity.setX(this.velocity.getX() + this.accel.getX() * dt);
+            this.velocity.setY(this.velocity.getY() + this.accel.getY() * dt);
+
+            //Now update possition with new vel values .. halfstep
+            this.pos.setX(this.pos.getX() + this.velocity.getX() * dt * 0.5) ; 
+            this.pos.setY(this.pos.getY() + this.velocity.getY() * dt * 0.5) ;
+
+
+            
+
+
+            /******************************************************************/
+            /* Check for collissions
+            /* might be moved out to check_for_coll() function of this obj
+            /* 
+            /*******************************************************************/
+            //Now do collision checks .. 
+            //OBS OBS This will have to be moved to  world update loop later.. now we only uppdate tha player . but later when we have several world objects it makes sense to put collissiontests and such there.
+            //First uppdate collider pos.
+            this.colider.pos.x = this.pos.getX();
+            this.colider.pos.y = this.pos.getY();
+
+            
+
+            //Test collisions against planets. errh , only one planet right now
+            this.response.clear();
+            this.collided = SAT.testCircleCircle(planet.body, this.colider, this.response); //polygon , circle a bit faster than the other way around
+            //console.log('Planet: x='+planet.body.pos.x+' , y='+planet.body.pos.y+' , r='+planet.body.r+' | Ship: x= , y= , r=' );
+            if (this.collided) {
+                //console.log("collided");
+                //Cals relative velocity In this case we know only player has vel . so rel_vel = player_vel .. should work in this case .. but make sure to take note of which obect is a and b .. since if we reverse the input in the coltest above this will shange ... since the normal wector will reverse.
+                //AAArgh .. need to select what vector lib to use .. well well .. for this one .. create new Vec2D vector and use that since most values are in that now.
+                //So use temp vector for normal-value
+                
+                //First correct for "sinking" error due to floatingpoint error
+                    this.generic_temp_vector.setAxes(this.response.overlapV.x,this.response.overlapV.y);                
+                    this.generic_temp_vector.multiplyByScalar(0.2);
+                    this.pos.add(this.generic_temp_vector); //perentage betwen 20 -80% shoud be ok
+
+                //Now continue with calulated response
+                this.generic_temp_vector.setAxes(this.response.overlapN.x,this.response.overlapN.y);
+                this.velAlongNormal = this.velocity.dot(this.generic_temp_vector);
+
+                if (this.velAlongNormal < 0) {
+                    //impulse scalar = -(1+bouncines) * this.velAlongNormal then / mas  but we have no mass yet .. so simplify
+                    //just use normal in temp vector to stor impulse..
+                    this.generic_temp_vector.multiplyByScalar(-(1+this.bouncines)*this.velAlongNormal);
+
+                    //Now apply to vel.
+                    this.velocity.add(this.generic_temp_vector); //Now that shoul be it.
+
+                }
+            }
+
+
+            /*****************************************/
+
+            //Second more physicaly correct version
+            //honors go to http://gamedevelopment.tutsplus.com/tutorials/how-to-create-a-custom-2d-physics-engine-the-basics-and-impulse-resolution--gamedev-6331
+            //Will push back player (or both obects later) along collision normal .. acording to restitution
+
+            /*****************************************/
+            for (var c = worldColliders.length - 1; c >= 0; c--) {
+            
+                this.response.clear();
+                this.collided = SAT.testPolygonCircle(worldColliders[c], this.colider, this.response); //polygon , circle a bit faster than the other way around
+
+                if (this.collided) {
+                    //console.log("collided");
+                    //Cals relative velocity In this case we know only player has vel . so rel_vel = player_vel .. should work in this case .. but make sure to take note of which obect is a and b .. since if we reverse the input in the coltest above this will shange ... since the normal wector will reverse.
+                    //AAArgh .. need to select what vector lib to use .. well well .. for this one .. create new Vec2D vector and use that since most values are in that now.
+                    //So use temp vector for normal-value
+                    
+                    //First correct for "sinking" error due to floatingpoint error
+                        this.generic_temp_vector.setAxes(this.response.overlapV.x,this.response.overlapV.y);                
+                        this.generic_temp_vector.multiplyByScalar(0.2);
+                        this.pos.add(this.generic_temp_vector); //perentage betwen 20 -80% shoud be ok
+
+                    //Now continue with calulated response
+                    this.generic_temp_vector.setAxes(this.response.overlapN.x,this.response.overlapN.y);
+                    this.velAlongNormal = this.velocity.dot(this.generic_temp_vector);
+
+                    if (this.velAlongNormal < 0) {
+                        //impulse scalar = -(1+bouncines) * this.velAlongNormal then / mas  but we have no mass yet .. so simplify
+                        //just use normal in temp vector to stor impulse..
+                        this.generic_temp_vector.multiplyByScalar(-(1+this.bouncines)*this.velAlongNormal);
+
+                        //Now apply to vel.
+                        this.velocity.add(this.generic_temp_vector); //Now that shoul be it.
+
+                    }
+                }
+            };
+
+
+            
+
+            
+        }//update() end
         
-    };
+    }; //Player end
     
 
     var Camera = {
@@ -544,22 +699,35 @@ function particelemitter(nrofparticles, pos, vel, maxage, particles_per_second) 
 
 
     var WorldMap = {
-        width: 2300,
-        height: 1600,
+        width: 12300,
+        height: 11600,
         //Obove obvious bad solution .since it creates a enourmous/humongus image.. so I realy have to do tiling . 
         //Fixed .. now it creates tiled world from below tilesize
 
         //I'l need the folowing.
 
-        tilesize: 512, //not to small since we want to avoud to obvious patterns
+        tilesize: 512, //not to small since we want to avoid to obvious patterns
         nr_of_tiles: 3, //The hight and width of tilemap
         world_width_in_tile_cols : Math.floor(this.width/this.tilesize)+1, //one extra so we do not have empty space at the rightmost end.
         world_height_in_tile_rows : Math.floor(this.height/this.tilesize)+1, //one extra so we do not have empty space at the rightmost end.
 
 
+        /*
         background_canvas: document.createElement('canvas'), //There seam to bee the best solution to create a new document object .. a new canvas and work with that imagedata
         background_canvas_z2: document.createElement('canvas'), //second depth ..  further away from camera
         background_canvas_z3: document.createElement('canvas'), //next depth ..  even further away from camera
+        */
+        //Testing to see if we get performancegain by using in DOM elements thatare already specyfied in html instead of above
+        /*
+        It does affect some .. but not as much as I hoped .. will try to render smaler parts instead
+        Final conclusion: For some reason hardware acceleration was not avaliable asdefault in chrome fror ubuntu .. so I just changed one flag chrome://flags/ (the topmost value .. list of somethihg ..) and controlled after reboot of browser the haerdware accell was on via chrome://gpu/ and it also was imediatly back to normal speed .. 
+
+        */
+         background_canvas: document.getElementById('bg-canvas1'),
+         background_canvas_z2: document.getElementById('bg-canvas2'),
+         background_canvas_z3: document.getElementById('bg-canvas3'),
+
+
         background_canvas_z2_size: 0.5, //a value betwen 0-1 where 0 i infinity far away and will not move at all all 1 is in face and will mov as standrard bg.
         background_canvas_z3_size: 0.1, //should be smaler than 2
         bg_tilemap: new Array(),  //Those will tell witch tiles will be where in the world.
@@ -718,75 +886,88 @@ for(iy=0; iy<(WorldMap.world_height_in_tile_rows); iy++){ //each row
     }
 }
 
+//Adda planet with gravity.
+var planet = {
+    //pos: new SAT.Vector(2500,1500),
+    pos: new Vec2D.create(1000,1000),
+    //Grr have to use Vec2D since camera obj funcrions use that now . will rewrite this!!! to user vector obj used in SAT but for now .. do tha long  way araoud!!
+    radius: 100,
+    body : new SAT.Circle(), //just dummy vals .. -- to be set to real vals in init later
+    mass : 1000000, //this has to be tested
+    tmp_vec: new Vec2D.create(0,0),
+    init: function(){
+        this.body = new SAT.Circle(new SAT.Vector(this.pos.getX(), this.pos.getY()), this.radius);
+        /*
+        this.body.pos.x = this.pos.getX;
+        this.body.pos.y = this.pos.getY;
+        this.body.r = this.radius;
+        */
+
+    },
+    update : function(dt){
+        //Empty for now .. planet does not have anny shanging parts right now.
+    },
+    render : function(dt){
+        Camera.world_to_relative_pos(this.pos, this.tmp_vec);
+        ctx.fillStyle = 'rgba(' + 250 + ',' + 200 + ',' + 10 + ',' + 0.5 + ')';
+
+        ctx.beginPath();
+        ctx.arc(this.tmp_vec.getX(),this.tmp_vec.getY(), this.radius, 0, 2 * Math.PI );
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.fillStyle = "yellow";
+        ctx.fill();
+   
+    }
+
+}
 
 
-
-
-     /**********************************************************************************************************************/
-
-
-     //Old version. using full size imagemap for whole world .. werry large image witch slows down script at certain size.
-     /*
-     WorldMap.background_canvas.width = WorldMap.width;
-     WorldMap.background_canvas.height = WorldMap.height;
-     var WorldBgContext = WorldMap.background_canvas.getContext('2d');
-
-     //Build paralax scrolling bg´s for diferent depths
-     WorldMap.background_canvas_z2.width = WorldMap.width * WorldMap.background_canvas_z2_size + Camera.viewport_width;
-     WorldMap.background_canvas_z2.height = WorldMap.height * WorldMap.background_canvas_z2_size + Camera.viewport_height;
-     var WorldBgContext_z2 = WorldMap.background_canvas_z2.getContext('2d');
-
-     WorldMap.background_canvas_z3.width = WorldMap.width * WorldMap.background_canvas_z3_size + Camera.viewport_width;
-     WorldMap.background_canvas_z3.height = WorldMap.height * WorldMap.background_canvas_z3_size + Camera.viewport_height;
-     var WorldBgContext_z3 = WorldMap.background_canvas_z3.getContext('2d');
-
-
-
-     for(iy=0; iy<WorldMap.background_canvas.height;iy++) { //do equal amont of stars in every depth
-        //for(ix=0; ix<WorldMap.background_canvas.width;ix++) {
-
-             var r = Math.floor((Math.random()*255)+1);
-             var g = 100;
-             var b = 150;
-             //var g = Math.floor((Math.random()*255)+1);
-             //var b = Math.floor((Math.random()*255)+1);
-             var a = 200;
-             WorldBgContext.fillStyle = "rgba("+r+","+g+","+b+","+(a/255)+")";
-             //WorldBgContext.fillRect( ix, iy, 1, 1 );
-             var t_px_zize = (Math.random()*7)+3; //Biggest size for closest bg
-             WorldBgContext.fillRect( (Math.random()*WorldMap.width)+1, (Math.random()*WorldMap.height)+1, t_px_zize, t_px_zize );
-
-             WorldBgContext_z2.fillStyle = "rgba("+r+","+g+","+b+","+(a/255)+")";
-             var t_px_zize = (Math.random()*5)+2; //Litle bit smaler
-             WorldBgContext_z2.fillRect( (Math.random()*WorldMap.background_canvas_z2.width)+1, (Math.random()*WorldMap.background_canvas_z2.height)+1, t_px_zize, t_px_zize );
-
-             WorldBgContext_z3.fillStyle = "rgba("+r+","+g+","+b+","+(a/255)+")";
-             var t_px_zize = (Math.random()*2)+1; //Litle bit smaler
-             WorldBgContext_z3.fillRect( (Math.random()*WorldMap.background_canvas_z3.width)+1, (Math.random()*WorldMap.background_canvas_z3.height)+1, t_px_zize, t_px_zize );
-        //}
-
-     }
-
-    */
-
-
-    var gravity = 9.8 *40; //  10Px = 1m -> 98px/sec
-    var air_friction = 0.53; //
-
-    var keysDown = {};
-    window.addEventListener('keydown', function(e) {
-        keysDown[e.keyCode] = true;
+    // Don't run the game when the tab isn't visible
+    window.addEventListener('focus', function() {
+        unpause();
     });
-    window.addEventListener('keyup', function(e) {
-        delete keysDown[e.keyCode];
+
+    window.addEventListener('blur', function() {
+        pause();
     });
-     
+
+    // Functions ---
+
+
+    // Reset game to original state
+    function reset() {
+       /* player.x = 0;
+        player.y = 0;
+        */
+        Player.init();
+        planet.init();
+
+        //Now just for testing purposes create a floating colider block somewhare on screen.
+        
+    }
+
+    // Pause and unpause
+    function pause() {
+        running = false;
+    }
+
+    function unpause() {
+        running = true;
+        time = Date.now();
+        //main(); //No need to call main again since we nevver stip that req-anim loop.  we just does not do annything in it if paused 
+    }
+   
     function update(dt) {
         
         //Create several step simulation
         var max_simulation_timestep = 0.002;
         var iterations = Math.round(dt/max_simulation_timestep)+1;
         var dt_part = dt/iterations;
+        
+        if(worldconfig.do_slowmo){ dt_part *= worldconfig.slowmo_factor; }
+
         for (it=0; it< iterations; it++) {
             Player.update(dt_part);
         }
@@ -798,34 +979,65 @@ for(iy=0; iy<(WorldMap.world_height_in_tile_rows); iy++){ //each row
         //Clear canvas
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = Player.color;
-
+        
         //Update cam position/focus.
         Camera.recalibrate_focus();
 
         //Render world and background
-        //ctx.drawImage(WorldMap.background_canvas, 0, 0);
         //WorldMap.render_from_fullimage();
-        WorldMap.render_from_randomized_tiles();
+         WorldMap.render_from_randomized_tiles();
+
+        //Render other world objects.  like tiles and opponents .. but . for now just throw it in here
+        for(i=0;i<worldColliders.length;i++){
+
+
+            ctx.fillStyle = 'red';
+            ctx.strokeStyle="red";
+            ctx.lineWidth=1;
+            temp_vec.setX(worldColliders[i].pos.x);
+            temp_vec.setY(worldColliders[i].pos.y);
+            Camera.world_to_relative_pos(temp_vec, temp_vec2);
+            
+            ctx.beginPath();
+            ctx.moveTo(temp_vec2.getX(),temp_vec2.getY());
+            
+            var points = worldColliders[i].calcPoints;
+            for (var j = 1; j < points.length; j++) {
+             ctx.lineTo(temp_vec2.getX() + points[j].x, temp_vec2.getY() + points[j].y);
+            }
+
+            //aaand close it
+            //ctx.lineTo(temp_vec2.getX(),temp_vec2.getY());
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.stroke();
+        }
+
+        //ctx.fillRect(temp_vec2.getX()-(box.w), temp_vec2.getY()-(box.h), box.w, box.h); //HMM converted box to poly might not have width
+
+       
         //Render All items and player
-        //ctx.fillRect(Player.pos.getX(), Player.pos.getY(), Player.width, Player.height);
+        planet.render(dt);
         Player.render(dt);
 
+        //
+        if (worldconfig.do_draw_collision_shapes) {debugg_text = "Drawing collision-shapes";} else {debugg_text = "";}
         //Render framerate.
         ctx.fillStyle = '#0f0';
         ctx.fillText("Framerate: "+ framerate +"/s ", 10, 10);
         ctx.fillText("Time/Last: "+ (time - last), 10, 20);
         ctx.fillText("Framecount: "+ framecount +"/s ", 10, 30);
+        ctx.fillText("DebugText: "+ debugg_text +"", 10, 40);
 
         
     }
      
     function run() {
-        var dt = (Date.now() - time) / 1000; //dt is in seconds
-        update(dt);
-        render(dt);
-        framecount++; //count frames
+        dt = (Date.now() - time) / 1000; //dt is in seconds
         time = Date.now();
+        framecount++; //count frames
+        
         if (time - last > 1000 ) //If more than one sec has pased 
         {
             //Calculate framerate
@@ -835,30 +1047,144 @@ for(iy=0; iy<(WorldMap.world_height_in_tile_rows); iy++){ //each row
             framecount = 0;
 
         }
+
+        update(dt);
+        render(dt);
+        //Do system fyncions .. like meny and stuff
+        if (GameInput.isDown('S')){
+            if(!slowmo_waiting_for_keyup) { //If key is not pressed / in released state .. we make sure
+                worldconfig.do_slowmo = !worldconfig.do_slowmo; //Toggle
+                slowmo_waiting_for_keyup = true; //and make usre we does not toggle untill next release and pressed again.
+            }
+        } else { 
+            slowmo_waiting_for_keyup = false;
+        }
+        if (GameInput.isDown('F')){
+            if(!frameskip_waiting_for_keyup) { //If key is not pressed / in released state .. we make sure
+                worldconfig.do_frameskip = !worldconfig.do_frameskip; //Toggle
+                frameskip_waiting_for_keyup = true; //and make usre we does not toggle untill next release and pressed again.
+            }
+        } else { 
+            frameskip_waiting_for_keyup = false;
+        }
+        if (GameInput.isDown('C')){
+            if(!draw_collision_shapeswaiting_for_keyup) { //If key is not pressed / in released state .. we make sure
+                worldconfig.do_draw_collision_shapes = !worldconfig.do_draw_collision_shapes; //Toggle
+                draw_collision_shapeswaiting_for_keyup = true; //and make usre we does not toggle untill next release and pressed again.
+            }
+        } else { 
+            draw_collision_shapeswaiting_for_keyup = false;
+        }
+        if (GameInput.isDown('G')){
+            if(!use_gravity_waiting_for_keyup) { //If key is not pressed / in released state .. we make sure
+                worldconfig.do_use_gravity = !worldconfig.do_use_gravity; //Toggle
+                use_gravity_waiting_for_keyup = true; //and make usre we does not toggle untill next release and pressed again.
+            }
+        } else { 
+            use_gravity_waiting_for_keyup = false;
+        }
+        if (GameInput.isDown('A')){
+            if(!use_airfriction_waiting_for_keyup) { //If key is not pressed / in released state .. we make sure
+                worldconfig.do_use_airfriction = !worldconfig.do_use_airfriction; //Toggle
+                use_airfriction_waiting_for_keyup = true; //and make usre we does not toggle untill next release and pressed again.
+            }
+        } else { 
+            use_airfriction_waiting_for_keyup = false;
+        }
+        if (GameInput.isDown('P')){
+            if(!use_planet_gravity_waiting_for_keyup) { //If key is not pressed / in released state .. we make sure
+                worldconfig.do_use_planet_gravity = !worldconfig.do_use_planet_gravity; //Toggle
+                use_planet_gravity_waiting_for_keyup = true; //and make usre we does not toggle untill next release and pressed again.
+            }
+        } else { 
+            use_planet_gravity_waiting_for_keyup = false;
+        }
     }
+    
 
     function main() {
-     
+        
+        requestAnimFrame(main);
+        
         if(!running) {
             return;
         }
-        //skip = !skip;
+
+        if (worldconfig.do_frameskip) skip = !skip;  //To only run at 30 fps.
         if (skip) {
             run();
         }
         
-        requestAnimFrame(main);
+        
     }
 
+    
+    
+    //var box;
+    //var box_polygonized;
+
+    //Ok .. now verry ugly solution to world geometry ..for collissiontesting.
+
+    //First create outer bounds for world
+    var WorldWallTop = new SAT.Box(new SAT.Vector(0,0), WorldMap.width,1); //top wall
+    var WorldWallTop_polygonized = WorldWallTop.toPolygon();
+    
+    var WorldWallBottom = new SAT.Box(new SAT.Vector(0,WorldMap.height-1), WorldMap.width,WorldMap.height); //bottom wall
+    var WorldWallBottom_polygonized = WorldWallBottom.toPolygon();
+    
+    var WorldWallLeft = new SAT.Box(new SAT.Vector(0,0), 1,WorldMap.height); //left wall
+    var WorldWallLeft_polygonized = WorldWallLeft.toPolygon();
+    
+    var WorldWallRight = new SAT.Box(new SAT.Vector(WorldMap.width-1,0), WorldMap.width,WorldMap.height); //right wall
+    var WorldWallRight_polygonized = WorldWallRight.toPolygon();
+    
+
+
+
+    //Some obstacles to navigate around
+    var box = new SAT.Box(new SAT.Vector(400,400), 300,30);
+    var box_polygonized = box.toPolygon();
+        box_polygonized.rotate(20 * Math.PI/180);
+
+    var box2 = new SAT.Box(new SAT.Vector(650,500), 300,30);
+    var box2_polygonized = box2.toPolygon();
+        box2_polygonized.rotate(-20 * Math.PI/180);
+    var worldColliders = [box_polygonized,box2_polygonized, WorldWallTop_polygonized, WorldWallBottom_polygonized, WorldWallLeft_polygonized, WorldWallRight_polygonized];
+    
+    //Set some game-global vars .. Maybe move those later .. but for now
+    var dt;
     var time = Date.now();
     var framecount = 0;
     var last = time;
     var running = true;
-    //Set some game-global vars .. Maybe move those later .. but for now
-    var bouncines = 780; //
-    var absorb_constant = 30
-    var ground_friction = 0.01;
+
+    var bouncines = 1280; //
+    var absorb_constant = 40
+    var ground_friction = 0.02;
     var skip = true;
+    var temp_vec = Vec2D.create(0,0);
+    var temp_vec2 = Vec2D.create(0,0);
+
+    var worldconfig = {
+    	gravity : 9.8 *40, //  10Px = 1m -> 98px/sec
+	    gravityconstant : 50, //value that affects how much gravity ther is betwen masses in the universe
+	    air_friction : 0.53, //
+	    do_slowmo : false,
+	    slowmo_factor : 0.2, // 1 no slowmo -- 0.1 much slowmo  
+	    do_frameskip : false,
+	    do_draw_collision_shapes : false,
+	    do_use_gravity : false,
+	    do_use_planet_gravity : false,
+	    do_use_airfriction : true
+    };
+    
+    var slowmo_waiting_for_keyup = false;
+    var frameskip_waiting_for_keyup = false;
+    var draw_collision_shapeswaiting_for_keyup = false;
+    var use_gravity_waiting_for_keyup = false;
+    var use_airfriction_waiting_for_keyup = false;
+    var use_planet_gravity_waiting_for_keyup = false;
+    var debugg_text = "";
 
     //Some temp vars used in rotation calc.. 
     var t_radians;
@@ -867,6 +1193,31 @@ for(iy=0; iy<(WorldMap.world_height_in_tile_rows); iy++){ //each row
     var t_nx;
     var t_ny;
 
+
+    //asd gui to tamper with some configurations.
+    
+    var gui = new dat.GUI();
+    var worldconfig_gui = gui.addFolder('World Settings :) ');
+    worldconfig_gui.add(worldconfig, 'do_use_gravity').listen();
+    worldconfig_gui.add(worldconfig, 'gravity').listen();
+    worldconfig_gui.add(worldconfig, 'do_use_planet_gravity').listen();
+    worldconfig_gui.add(worldconfig, 'gravityconstant').listen();
+    worldconfig_gui.add(worldconfig, 'do_use_airfriction').listen();
+    worldconfig_gui.add(worldconfig, 'air_friction').listen();
+    worldconfig_gui.open();
+
+    var planetsettings_gui = gui.addFolder('Planet Settings  ');
+    planetsettings_gui.add(planet, 'mass').listen();
+    planetsettings_gui.open();
+    
+
+    var playersettings_gui = gui.addFolder('Player Settings  ');
+    playersettings_gui.add(Player, 'item_mass').listen();
+    playersettings_gui.add(Player, 'trust').listen();
+    planetsettings_gui.open();
+
+    //Now start th game
+    reset();
     main();
 
 
@@ -890,21 +1241,29 @@ for(iy=0; iy<(WorldMap.world_height_in_tile_rows); iy++){ //each row
 //Todo
 /*********************************************
 
-* Switch from crappy vectorcode to one of the folowing candidates
-glmatrix-version , vector2d on npm, vectors from three or from mathlib used by  Canvas3D on kevs3d.co.uk
-I would realy like to be able to use vecto.getY() and .getY() referece since that make the code so mych simler to read .. when doing bounce and collision calculation stuff.
+Add prorteies box so I can ajust vals during play. to test.
 
-*Really need to organise the code and thin thru what stuct I vill have on objecs.. 
-    Can I have more then one plauer camera  and so on.. probably if I wil be able to switch viacles and so. 
+*Switch to pixi.js  seam to be a strong lib for doing graphics. But JUST MAYBE.. will have to evaluate if it is needed .. seam to exist some nice javascript gamelibs that doesnot need that to render fast .. 
+and using it for speed up tile-rendering for example will slow down if it has to fall back on canvas .. 
+So .. eveluate the folowing first.
+http://gamejs.org/
+https://github.com/grapefruitjs/grapefruit
+And obove all http://melonjs.github.io/ SEAM VERRY NICE
+Both have nice working tilemanagement fast and all.
 
+
+*Really need to organize the code and think thru what stuct I vill have on objecs.. 
+    Can I have more then one player camera  and so on.. probably if I will be able to switch viacles and so. 
 
 *Add gravityswitch
-
+*
 *Colission handler. Use this later.
 if (object1.getX() < object2.getX() + object2.width  && object1.getX() + object1.width  > object2.getX() &&
         object1.getY() < object2.getY() + object2.height && object1.getY() + object1.height > object2.getY()) {
 // The objects are touching
 }
+
+*Reorganise physics loops .. now its a mess.. Needs to be better sepparated from input 
 
 or even faste as found on http://devmag.org.za/2009/04/13/basic-collision-detection-in-2d-part-1/
 Controlls if the rects is not touching. If anny of below cond is true.. they are not touching.
@@ -928,7 +1287,7 @@ return NOT (
 
 
 
-*Organize renderable and interactable items.  Should they hanlde render rhemselfe or what? And for interact physically in the world .. same q there.
+*Organize renderable and interactable items.  Should they hanlde render themselfe or what? And for interact physically in the world .. same q there.
     *Plan: Let all physics-affected items has one funktion for that .. all rendable items has one funk to render themselfes and so in. 
     Then create an arry with physics-items and lopp though and call that function. And then the same with renderable items.
     In that way we can let them have different ways of render themselfe .. but also let them inherit
@@ -942,13 +1301,21 @@ return NOT (
 
 //Done
 /*********************************************
+*Add slowmotion function .. 
+
+*Added input-lib to separate file.
+
+* Switch from crappy vectorcode to one of the folowing candidates
+glmatrix-version , vector2d on npm, vectors from three or from mathlib used by  Canvas3D on kevs3d.co.uk
+I would realy like to be able to use vecto.getY() and .getY() referece since that make the code so mych simler to read .. when doing bounce and collision calculation stuff.
+ADDED Vec2D lib .. but still using none of its functions except rotation.. 
 
 *add posibility to use img instead of just squares.
 
-*Finish cameromode with camera_slak and all
-*Change rotationfuntion to store curretn rotation so that sipler rotation can be done.  not rotate 0.0001 deg each time .. instead .. add 0,001 deg to rotation and then rotate round(current rotation)  No point in actualy swith to lookuptables for sin and cos .. current javascript func acually faster
+*Finish cameromode with camera_slack and all
+*Change rotationfunction to store curretn rotation so that simpler rotation can be done.  not rotate 0.0001 deg each time .. instead .. add 0,001 deg to rotation and then rotate round(current rotation)  No point in actualy swith to lookuptables for sin and cos .. current javascript func acually faster
 
-*Particle-engine. Will I relly loop though all particles once for pos-update and then once more for render.. or will I be able to update pos and at the same time render to some temp-canvas thet later will be reder alla t once as one bitmap.  --> called from render-func in player .. and both phys update and render.. since it unlikely it will interact with other parts of game
+*Particle-engine. Will I relly loop though all particles once for pos-update and then once more for render.. or will I be able to update pos and at the same time render to some temp-canvas that later will be redered all at once as one bitmap.  --> called from render-func in player .. and both phys update and render.. since it unlikely it will interact with other parts of game
 
 Tile world adn br to avoid those enourmous bitmaps
 
@@ -966,5 +1333,8 @@ Tile world adn br to avoid those enourmous bitmaps
 </head>
 <body>
     <canvas id="canvas"></canvas>
+    <canvas id="bg-canvas1" style="display:none;"></canvas>
+    <canvas id="bg-canvas2" style="display:none;"></canvas>
+    <canvas id="bg-canvas3" style="display:none;"></canvas>
 </body>
 </html>
